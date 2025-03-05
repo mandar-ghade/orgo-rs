@@ -1,6 +1,15 @@
 use crate::matter::element::Element;
+
+use super::matter_trait::Matter;
 #[allow(unused)]
 #[derive(Clone, Debug, PartialEq)]
+//
+// enum Hybridization {
+//     Sp,
+//     Sp2,
+//     Sp3,
+// }
+//
 
 pub struct Atom {
     element: Element,
@@ -10,12 +19,18 @@ pub struct Atom {
 
 #[allow(unused)]
 impl Atom {
-    fn new(element_num: u8) -> Self {
+    pub fn new(element_num: u8) -> Self {
         let element = Element::new(element_num);
         Atom {
             electrons: element.number,
             element,
             neutrons: 0,
         }
+    }
+}
+
+impl Matter for Atom {
+    fn to_string(&self) -> String {
+        self.element.as_str().to_string()
     }
 }

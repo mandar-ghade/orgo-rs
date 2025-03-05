@@ -52,22 +52,19 @@ fn is_delimiter(c: &char) -> bool {
 }
 
 fn get_element_str(curr: &char, iter: &mut Peekable<Chars>) -> Option<String> {
-    match Some(curr.to_string()).map(|mut c| {
-        if let Some(nxt) = iter.peek() {
-            c.push(*nxt);
-            let _ = iter.next();
-        }
-        c
-    }) {
-        Some(c) => {
-            if ELEMENTS.get(c.as_str()).is_some() {
-                Some(c)
-            } else {
-                None
+    Some(curr.to_string())
+        .map(|mut c| {
+            if let Some(nxt) = iter.peek() {
+                c.push(nxt);
             }
-        }
-        None => None,
-    }
+        })
+        .map(|c| {
+            if ELEMENTS.get(c.as_ref()).is_some() {
+                return c;
+            } else {
+                return None;
+            }
+        })
 }
 
 impl<'a> Compound<'_> {

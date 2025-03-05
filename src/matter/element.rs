@@ -1,4 +1,4 @@
-use crate::misc::element_info::ELEMENTS;
+use crate::misc::element_info::{ELEMENTS, ELEMENTS_VEC};
 
 #[allow(unused)]
 #[derive(Clone, Debug, PartialEq)]
@@ -13,7 +13,7 @@ impl Element {
     }
 
     pub fn as_str(&self) -> &str {
-        ELEMENTS
+        ELEMENTS_VEC
             .get(self.number as usize)
             .expect("Invalid element number received.")
     }
