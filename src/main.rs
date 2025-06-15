@@ -4,7 +4,7 @@ use matter::compound::{Compound, CompoundError};
 mod matter;
 mod misc;
 
-fn parse_str<'a>(input_str: String) -> Result<Compound<'a>, CompoundError> {
+fn parse_str(input_str: String) -> Result<Compound, CompoundError> {
     Compound::from_str(input_str.as_str())
 }
 

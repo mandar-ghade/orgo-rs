@@ -1,16 +1,9 @@
 use crate::matter::element::Element;
 
 use super::matter_trait::Matter;
+
 #[allow(unused)]
 #[derive(Clone, Debug, PartialEq)]
-//
-// enum Hybridization {
-//     Sp,
-//     Sp2,
-//     Sp3,
-// }
-//
-
 pub struct Atom {
     element: Element,
     neutrons: u8,
