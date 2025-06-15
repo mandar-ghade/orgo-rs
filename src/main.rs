@@ -1,8 +1,8 @@
 use std::str::FromStr;
 
 use matter::compound::{Compound, CompoundError};
+mod constants;
 mod matter;
-mod misc;
 
 fn parse_str(input_str: String) -> Result<Compound, CompoundError> {
     Compound::from_str(input_str.as_str())
