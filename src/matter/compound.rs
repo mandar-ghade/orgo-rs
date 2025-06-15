@@ -1,8 +1,5 @@
-use itertools::sorted;
-use thiserror::Error;
-
-use crate::{constants::ELEMENTS, matter::atom::Atom};
 use core::panic;
+use itertools::sorted;
 use std::{
     collections::{BTreeSet, HashMap, LinkedList},
     fmt,
@@ -10,7 +7,7 @@ use std::{
     str::{Chars, FromStr},
 };
 
-use super::matter::Matter;
+use crate::{constants::ELEMENTS, matter::atom::Atom};
 
 #[derive(Clone, PartialEq, Debug, Hash, Eq)]
 struct Location {
@@ -66,11 +63,21 @@ impl Compound {
             .expect("Couldn't convert u8 to usize; Getting side chain length")
     }
 
-    fn side_chain_as_str(&self, backbone_i: u8) -> String {
+    fn side_chain_as_str(&self, backbone_i: u8) -> Result<String, fmt::Error> {
+        let mut s = String::new();
+        self.write_side_chain(&mut s, backbone_i)?;
+        Ok(s)
+    }
+
+    fn write_side_chain<W: fmt::Write>(
+        &self,
+        w: &mut W,
+        backbone_i: u8,
+    ) -> fmt::Result {
         fn extract_cmp_str_and_count(inp: &String) -> (String, Option<u8>) {
             let has_delims = inp
                 .chars()
-                .any(|c| is_open_delimiter(&c) || is_close_delimiter(&c));
+                .any(|c| is_open_delimiter(c) || is_close_delimiter(c));
             let has_count = inp.chars().any(|c| c.is_digit(10));
             if !has_delims && !has_count {
                 (inp.to_owned(), None)
@@ -99,7 +106,7 @@ impl Compound {
                 let mut fmt_str = String::new();
                 for (i, c) in inp.chars().enumerate() {
                     if i == 0 || i == size - 1 {
-                        if !(is_open_delimiter(&c) || is_close_delimiter(&c)) {
+                        if !(is_open_delimiter(c) || is_close_delimiter(c)) {
                             panic!(
                                 "Issue mapping out delimiter locations for compound with no count listing"
                             );
@@ -123,9 +130,9 @@ impl Compound {
                 let mut rhs_delim_count = 0;
                 for c in inp.chars() {
                     // TODO: Check if open & close delims are the same type (brackets vs parens)
-                    if is_open_delimiter(&c) {
+                    if is_open_delimiter(c) {
                         lhs_delim_count += 1;
-                    } else if is_close_delimiter(&c) {
+                    } else if is_close_delimiter(c) {
                         rhs_delim_count += 1;
                     } else if !c.is_digit(10) && count.is_empty() {
                         fmt_str.push(c);
@@ -153,7 +160,6 @@ impl Compound {
         }
 
         assert!(self.has_side_chain(backbone_i), "Side chain was expected");
-        let mut s: String = String::new();
         let mut q: LinkedList<String> = LinkedList::new();
         // queue
         for (atom_str, i) in sorted(
@@ -180,30 +186,28 @@ impl Compound {
 
                 let one_letter = q_str.len() == 1;
                 if count == 1 && one_letter {
-                    s.push_str(q_str.as_str());
+                    write!(w, "{}", q_str)?;
                 } else if count == 1 {
-                    s.push_str(format!("({})", q_str).as_str());
+                    write!(w, "({})", q_str)?;
                 } else if one_letter {
-                    s.push_str(format!("{}{}", q_str, count).as_str());
+                    write!(w, "{}{}", q_str, count)?;
                 } else {
-                    s.push_str(format!("({}){}", q_str, count).as_str());
+                    write!(w, "({}){}", q_str, count)?;
                 }
                 q = LinkedList::new(); // resets queue
-                s.push_str(atom_str.as_str());
+                write!(w, "{}", atom_str)?;
                 continue;
             } else if !self.has_side_chain(i) {
-                s.push_str(atom_str.as_str());
+                write!(w, "{}", atom_str)?;
                 continue;
             }
-            let sc_str = self.side_chain_as_str(i);
+            let sc_str = self.side_chain_as_str(i)?;
             if q.is_empty() {
                 q.push_back(atom_str);
                 continue;
             }
 
             // q isn't empty, 4th case
-            //
-
             if atom_str
                 == *q
                     .front()
@@ -225,13 +229,13 @@ impl Compound {
 
                 let one_letter = q_str.len() == 1;
                 if count == 1 && one_letter {
-                    s.push_str(q_str.as_str());
+                    write!(w, "{}", q_str)?;
                 } else if count == 1 {
-                    s.push_str(format!("({})", q_str).as_str());
+                    write!(w, "({})", q_str)?;
                 } else if one_letter {
-                    s.push_str(format!("{}{}", q_str, count).as_str());
+                    write!(w, "{}{}", q_str, count)?;
                 } else {
-                    s.push_str(format!("({}){}", q_str, count).as_str());
+                    write!(w, "({}){}", q_str, count)?;
                 }
                 q = LinkedList::new(); // resets queue
             }
@@ -255,79 +259,60 @@ impl Compound {
 
             let one_letter = q_str.len() == 1;
             if count == 1 && one_letter {
-                s.push_str(q_str.as_str());
+                write!(w, "{}", q_str)?;
             } else if count == 1 {
-                s.push_str(format!("({})", q_str).as_str());
+                write!(w, "({})", q_str)?;
             } else if one_letter {
-                s.push_str(format!("{}{}", q_str, count).as_str());
+                write!(w, "{}{}", q_str, count)?;
             } else {
-                s.push_str(format!("({}){}", q_str, count).as_str());
+                write!(w, "({}){}", q_str, count)?;
             }
         }
-        s
+        Ok(())
     }
+}
 
-    pub fn as_str(&self) -> String {
-        fn wrap_str(s: &mut String, side_chain_str: &str) {
-            s.push('(');
-            s.push_str(side_chain_str);
-            s.push(')')
-        }
-
-        let mut s: String = String::new();
+impl fmt::Display for Compound {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for i in self.backbone.iter() {
             let atom = self
                 .atoms
                 .get(*i as usize)
                 .expect("Atom deleted from indexed");
-            s.push_str(atom.to_string().as_str());
+            write!(f, "{}", atom)?;
             if self.has_side_chain(*i) {
                 let sc_length = self.get_sidechain_len(*i);
                 assert!(
                     sc_length != 0,
-                    "Side chain length cannot be zero if it has a side chain....."
+                    "Side chain length cannot be zero if it has a side chain."
                 );
-                let sc_str = self.side_chain_as_str(*i);
+                let sc_str = self.side_chain_as_str(*i)?;
                 if sc_length != 1 {
-                    wrap_str(&mut s, &sc_str);
+                    write!(f, "({})", sc_str)?;
                 } else {
-                    s.push_str(&sc_str);
+                    write!(f, "{}", sc_str)?;
                 }
             }
         }
-        s
+        Ok(())
     }
 }
 
-impl fmt::Display for Compound {
-    // Converts Compound to string
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.as_str())
-    }
-}
-
-impl Matter for Compound {
-    fn to_string(&self) -> String {
-        self.as_str()
-    }
-}
-
-#[derive(Debug, Error)]
+#[allow(dead_code)]
+#[derive(thiserror::Error, Debug)]
 pub enum CompoundError {
     #[error("Invalid Element received: `{0}`")]
     InvalidElementError(String),
 }
 
-fn is_open_delimiter(c: &char) -> bool {
-    *c == '(' || *c == '['
+#[inline]
+fn is_open_delimiter(c: char) -> bool {
+    c == '(' || c == '['
 }
 
-fn is_close_delimiter(c: &char) -> bool {
-    *c == ')' || *c == ']'
-}
-
-fn is_delimiter(c: &char) -> bool {
-    *c == '(' || *c == ')' || *c == '[' || *c == ']'
+#[inline]
+fn is_close_delimiter(c: char) -> bool {
+    c == ')' || c == ']'
 }
 
 struct Token {
@@ -346,22 +331,15 @@ impl Token {
     }
 }
 
-fn get_element_str(curr: &char, iter: &mut Peekable<Chars>) -> Option<String> {
-    match Some(curr.to_string()).map(|mut c| {
-        if let Some(nxt) = iter.peek() {
-            c.push(*nxt);
-            let _ = iter.next();
-        }
-        c
-    }) {
-        Some(c) => {
-            if ELEMENTS.get(c.as_str()).is_some() {
-                Some(c)
-            } else {
-                None
-            }
-        }
-        None => None,
+fn get_element_str(curr: char, it: &mut Peekable<Chars>) -> Option<String> {
+    let sym = match it.next() {
+        Some(c) => format!("{}{}", curr, c),
+        None => curr.to_string(),
+    };
+    if ELEMENTS.contains(sym.as_str()) {
+        Some(sym)
+    } else {
+        None
     }
 }
 
@@ -376,7 +354,7 @@ fn get_element_count(iter: &mut Peekable<Chars>) -> u16 {
         }
         iter.next();
     }
-    count_str.parse().unwrap_or(1)
+    count_str.parse::<u16>().unwrap_or(1)
 }
 
 fn parse_into_tokens(
@@ -386,36 +364,36 @@ fn parse_into_tokens(
     // let mut carbon_tk: Option<Token> = None;
     let mut curr_tk: Option<Token> = None;
     while let Some(curr) = iter.next() {
-        if is_open_delimiter(&curr) && curr_tk.is_some() {
+        if is_open_delimiter(curr) && curr_tk.is_some() {
             let parts = parse_into_tokens(iter)?;
-            //let count = get_element_count(iter);
+            // let count = get_element_count(iter);
             if let Some(token) = curr_tk.as_mut() {
                 token.parts = parts;
-                //token.count = count;
+                // token.count = count;
             }
         }
-        if is_close_delimiter(&curr) {
+        if is_close_delimiter(curr) {
             return Ok(tokens_vec);
         }
-        let Some(element_str) = get_element_str(&curr, iter) else {
+        let Some(element_str) = get_element_str(curr, iter) else {
             continue;
         };
-        let count = get_element_count(iter);
+        let _count = get_element_count(iter);
         dbg!(element_str);
     }
     Ok(tokens_vec)
 }
 
 impl Compound {
-    fn parse(s: &str) -> Result<Self, CompoundError> {
+    fn parse(_s: &str) -> Result<Self, CompoundError> {
         todo!()
     }
 }
 
 impl FromStr for Compound {
     type Err = CompoundError;
+
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        todo!()
-        // Compound::parse(s)
+        Compound::parse(s)
     }
 }
