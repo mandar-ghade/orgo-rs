@@ -8,16 +8,23 @@ use std::{
 
 use crate::{constants::ELEMENTS, matter::atom::Atom};
 
-#[derive(Clone, PartialEq, Debug, Hash, Eq)]
+#[derive(Clone, Copy, PartialEq, Debug, Hash, Eq)]
 pub struct Location {
-    pub x: u16,
-    pub y: u16,
+    pub x: i16,
+    pub y: i16,
 }
 
 #[allow(dead_code)]
 impl Location {
-    pub fn new(x: u16, y: u16) -> Self {
+    pub fn new(x: i16, y: i16) -> Self {
         Self { x, y }
+    }
+
+    pub fn shift(&self, dx: i16, dy: i16) -> Self {
+        Self {
+            x: self.x + dx,
+            y: self.y + dy,
+        }
     }
 }
 
@@ -140,6 +147,22 @@ fn extract_cmp_str_and_count(
 }
 
 impl Compound {
+    pub fn new(
+        atoms: Vec<Atom>,
+        locations: Vec<Location>,
+        location_to_idx: HashMap<Location, u8>,
+        backbone: Vec<u8>,
+        side_chains: HashMap<u8, BTreeSet<u8>>,
+    ) -> Self {
+        Self {
+            atoms,
+            locations,
+            location_to_idx,
+            backbone,
+            side_chains,
+        }
+    }
+
     fn get_atom(&self, i: u8) -> Option<&Atom> {
         self.atoms.get(i as usize)
     }
@@ -283,6 +306,7 @@ impl fmt::Display for Compound {
                     "Side chain length cannot be zero if it has a side chain."
                 );
                 let sc_str = self.side_chain_as_str(*i)?;
+                // TODO: Grouping
                 if sc_length != 1 {
                     write!(f, "({})", sc_str)?;
                 } else {
