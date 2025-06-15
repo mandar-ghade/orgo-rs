@@ -1,4 +1,4 @@
-use crate::misc::element_info::{ELEMENTS, ELEMENTS_VEC};
+use crate::constants::ELEMENTS_VEC;
 
 #[allow(unused)]
 #[derive(Clone, Debug, PartialEq)]

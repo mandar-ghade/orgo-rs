@@ -1,20 +1,16 @@
 use itertools::sorted;
-use strum_macros::Display;
 use thiserror::Error;
 
-use crate::{
-    matter::atom::Atom,
-    misc::element_info::{ELEMENTS, ELEMENT_WEIGHTS},
-};
+use crate::{constants::ELEMENTS, matter::atom::Atom};
 use core::panic;
 use std::{
-    collections::{BTreeMap, BTreeSet, HashMap, HashSet, LinkedList},
-    fmt::{self, write},
+    collections::{BTreeSet, HashMap, LinkedList},
+    fmt,
     iter::Peekable,
     str::{Chars, FromStr},
 };
 
-use super::matter_trait::Matter;
+use super::matter::Matter;
 
 #[derive(Clone, PartialEq, Debug, Hash, Eq)]
 struct Location {
@@ -23,17 +19,21 @@ struct Location {
 }
 
 #[derive(Clone, PartialEq, Debug)]
-// Represents a Linear Compound
+/// Represents a Linear Compound
 pub struct Compound {
-    // Covalent Compound
+    /// Covalent Compound
     atoms: Vec<Atom>,
-    locations: Vec<Location>, // each index represents the location of an atom
-    location_to_idx: HashMap<Location, u8>, // From location, we can compute the Atom's index
-    backbone: Vec<u8>,        // should theoretically be a size
-    side_chains: HashMap<u8, BTreeSet<u8>>, // retains order
-                              // ^ Side chains can have side-chains (unfortunately)
-                              // ^ sort of like an undirected graph
-                              // # TODO: Ensure values != key and value != backbone idx
+    /// Each index represents the location of an atom
+    locations: Vec<Location>,
+    /// From location, we can compute the Atom's index
+    location_to_idx: HashMap<Location, u8>,
+    /// should theoretically be a size
+    backbone: Vec<u8>,
+    /// retains order
+    /// ^ Side chains can have side-chains (unfortunately)
+    /// ^ sort of like an undirected graph
+    side_chains: HashMap<u8, BTreeSet<u8>>,
+    // TODO: Ensure values != key or backbone idx
 }
 // TODO: Pseudo-Dijkstra's longest chain implementation (using largest distance)
 
@@ -47,7 +47,9 @@ impl Compound {
             && !self
                 .side_chains
                 .get(&i)
-                .expect("Expected side chain set while evaluating its emptiness")
+                .expect(
+                    "Expected side chain set while evaluating its emptiness",
+                )
                 .is_empty()
     }
 
@@ -81,10 +83,13 @@ impl Compound {
                     } else if c.is_digit(10) {
                         count.push(c);
                     } else if !count.is_empty() {
-                        panic!("XS string detected (extracting cmp str and count)");
+                        panic!(
+                            "XS string detected (extracting cmp str and count)"
+                        );
                     }
                 }
-                let count_u8: u8 = count.parse().expect("Couldn't convert to u8");
+                let count_u8: u8 =
+                    count.parse().expect("Couldn't convert to u8");
                 (fmt_str, Some(count_u8))
             } else if has_delims && !has_count {
                 let size = inp.len();
@@ -124,7 +129,9 @@ impl Compound {
                         rhs_delim_count += 1;
                     } else if !c.is_digit(10) && count.is_empty() {
                         fmt_str.push(c);
-                    } else if c.is_digit(10) && lhs_delim_count == rhs_delim_count {
+                    } else if c.is_digit(10)
+                        && lhs_delim_count == rhs_delim_count
+                    {
                         // Matching # of opening & closing delims
                         count.push(c);
                     } else if !count.is_empty() {
@@ -137,7 +144,8 @@ impl Compound {
                 if count.is_empty() {
                     panic!("Count not found when searching around delims (nesting issues)")
                 }
-                let count_u8: u8 = count.parse().expect("Couldn't convert to u8");
+                let count_u8: u8 =
+                    count.parse().expect("Couldn't convert to u8");
                 (fmt_str, Some(count_u8))
             } else {
                 panic!("Undefined behavior"); // Should never execute
@@ -241,9 +249,9 @@ impl Compound {
         }
         if !q.is_empty() {
             let count = q.len();
-            let q_str = q
-                .pop_back()
-                .expect("Error: Couldn't pop back of queue when assessing its length");
+            let q_str = q.pop_back().expect(
+                "Error: Couldn't pop back of queue when assessing its length",
+            );
 
             let one_letter = q_str.len() == 1;
             if count == 1 && one_letter {
@@ -371,9 +379,11 @@ fn get_element_count(iter: &mut Peekable<Chars>) -> u16 {
     count_str.parse().unwrap_or(1)
 }
 
-fn parse_into_tokens(iter: &mut Peekable<Chars>) -> Result<Vec<Token>, CompoundError> {
-    let mut tokens_vec: Vec<Token> = Vec::new();
-    let mut carbon_tk: Option<Token> = None;
+fn parse_into_tokens(
+    iter: &mut Peekable<Chars>,
+) -> Result<Vec<Token>, CompoundError> {
+    let tokens_vec: Vec<Token> = Vec::new();
+    // let mut carbon_tk: Option<Token> = None;
     let mut curr_tk: Option<Token> = None;
     while let Some(curr) = iter.next() {
         if is_open_delimiter(&curr) && curr_tk.is_some() {

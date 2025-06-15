@@ -1,6 +1,6 @@
 use crate::matter::element::Element;
 
-use super::matter_trait::Matter;
+use super::matter::Matter;
 
 #[allow(unused)]
 #[derive(Clone, Debug, PartialEq)]
