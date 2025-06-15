@@ -1,6 +1,6 @@
-use crate::matter::element::Element;
+use std::fmt;
 
-use super::matter::Matter;
+use super::element::Element;
 
 #[allow(unused)]
 #[derive(Clone, Debug, PartialEq)]
@@ -22,8 +22,8 @@ impl Atom {
     }
 }
 
-impl Matter for Atom {
-    fn to_string(&self) -> String {
-        self.element.as_str().to_string()
+impl fmt::Display for Atom {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.element.as_str())
     }
 }
