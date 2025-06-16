@@ -12,13 +12,13 @@ pub struct Atom {
 
 #[allow(unused)]
 impl Atom {
-    pub fn new(element_num: u8) -> Self {
-        let element = Element::new(element_num);
-        Atom {
+    pub fn new(element_num: u8) -> Option<Self> {
+        let element = Element::new(element_num)?;
+        Some(Atom {
             electrons: element.number,
             element,
             neutrons: 0,
-        }
+        })
     }
 }
 
