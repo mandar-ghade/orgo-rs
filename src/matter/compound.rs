@@ -34,33 +34,119 @@ pub struct Compound {
 }
 // TODO: Pseudo-Dijkstra's longest chain implementation (using largest distance)
 
+fn extract_cmp_str_and_count(
+    inp: &String,
+) -> CompoundResult<(String, Option<u8>)> {
+    let has_delims = inp.chars().any(|c| is_delimiter(c));
+    let has_count = inp.chars().any(|c| c.is_digit(10));
+    if !has_delims && !has_count {
+        Ok((inp.to_owned(), None))
+    } else if !has_delims && has_count {
+        let mut fmt_str = String::new();
+        let mut count: String = String::new();
+        for c in inp.chars() {
+            if !c.is_digit(10) && count.is_empty() {
+                fmt_str.push(c);
+            } else if c.is_digit(10) {
+                count.push(c);
+            } else if !count.is_empty() {
+                return Err(CompoundError::Parsing(
+                    "XS string detected (extracting cmp str and count)".into(),
+                ));
+            }
+        }
+        let count_u8: u8 = count
+            .parse()
+            .map_err(|_| CompoundError::Parsing("Invalid count.".into()))?;
+        Ok((fmt_str, Some(count_u8)))
+    } else if has_delims && !has_count {
+        let size = inp.len();
+        if size <= 2 {
+            return Err(CompoundError::Parsing(
+                "Misformatted compound str".into(),
+            ));
+        }
+        let mut fmt_str = String::new();
+        for (i, c) in inp.chars().enumerate() {
+            if i == 0 || i == size - 1 {
+                assert!(is_delimiter(c), "Issue mapping out delimiter locations for compound with no count listing.");
+                continue;
+            }
+            fmt_str.push(c);
+        }
+        if fmt_str.is_empty() {
+            return Err(CompoundError::Parsing(
+                "No string detected within delimiters.".into(),
+            ));
+        }
+        Ok((fmt_str, None))
+    } else if has_delims && has_count {
+        let size = inp.len();
+        if size <= 2 {
+            return Err(CompoundError::Parsing(
+                "Misformatted compound str.".into(),
+            ));
+        }
+        let mut fmt_str = String::new();
+        let mut count: String = String::new();
+        let mut lhs_delim_count = 0;
+        let mut rhs_delim_count = 0;
+        for c in inp.chars() {
+            // TODO: Check if open & close delims are the same type: [] vs ()
+            if is_open_delimiter(c) {
+                lhs_delim_count += 1;
+            } else if is_close_delimiter(c) {
+                rhs_delim_count += 1;
+            } else if !c.is_digit(10) && count.is_empty() {
+                fmt_str.push(c);
+            } else if c.is_digit(10) && lhs_delim_count == rhs_delim_count {
+                // Matching # of opening & closing delims
+                count.push(c);
+            } else if !count.is_empty() {
+                return Err(CompoundError::Parsing(
+                    "XS string detected (extracting cmp str and count)".into(),
+                ));
+            }
+        }
+        if fmt_str.is_empty() {
+            return Err(CompoundError::Parsing(
+                "No string detected within delimiters.".into(),
+            ));
+        }
+        assert!(
+            !count.is_empty(),
+            "Count not found when searching around delims (nesting issues)"
+        );
+        let count_u8: u8 = count
+            .parse()
+            .map_err(|_| CompoundError::Parsing("Invalid count.".into()))?;
+        Ok((fmt_str, Some(count_u8)))
+    } else {
+        panic!("Undefined behavior"); // Should never execute
+    }
+}
+
 impl Compound {
     fn get_atom(&self, i: u8) -> Option<&Atom> {
         self.atoms.get(i as usize)
     }
 
     fn has_side_chain(&self, i: u8) -> bool {
-        self.side_chains.contains_key(&i)
-            && !self
-                .side_chains
-                .get(&i)
-                .expect(
-                    "Expected side chain set while evaluating its emptiness",
-                )
-                .is_empty()
+        if let Some(side_chain) = self.side_chains.get(&i) {
+            side_chain.is_empty()
+        } else {
+            false
+        }
     }
 
-    fn get_sidechain_len(&self, backbone_i: u8) -> u8 {
-        assert!(
-            self.has_side_chain(backbone_i),
-            "Side chain was expected while retrieving backbone's side chain length."
-        );
-        self.side_chains
-            .get(&backbone_i)
-            .expect("Expected side chain set while evaluating its emptiness")
-            .len()
-            .try_into()
-            .expect("Couldn't convert u8 to usize; Getting side chain length")
+    fn get_sidechain_len(&self, backbone_i: u8) -> CompoundResult<u8> {
+        let side_chain =
+            self.side_chains.get(&backbone_i).ok_or_else(|| {
+                CompoundError::Unknown("Side chain not found.".into())
+            })?;
+        side_chain.len().try_into().map_err(|_| {
+            CompoundError::Unknown("Invalid side chain length.".into())
+        })
     }
 
     fn side_chain_as_str(&self, backbone_i: u8) -> Result<String, fmt::Error> {
@@ -74,108 +160,20 @@ impl Compound {
         w: &mut W,
         backbone_i: u8,
     ) -> fmt::Result {
-        fn extract_cmp_str_and_count(inp: &String) -> (String, Option<u8>) {
-            let has_delims = inp
-                .chars()
-                .any(|c| is_open_delimiter(c) || is_close_delimiter(c));
-            let has_count = inp.chars().any(|c| c.is_digit(10));
-            if !has_delims && !has_count {
-                (inp.to_owned(), None)
-            } else if !has_delims && has_count {
-                let mut fmt_str = String::new();
-                let mut count: String = String::new();
-                for c in inp.chars() {
-                    if !c.is_digit(10) && count.is_empty() {
-                        fmt_str.push(c);
-                    } else if c.is_digit(10) {
-                        count.push(c);
-                    } else if !count.is_empty() {
-                        panic!(
-                            "XS string detected (extracting cmp str and count)"
-                        );
-                    }
-                }
-                let count_u8: u8 =
-                    count.parse().expect("Couldn't convert to u8");
-                (fmt_str, Some(count_u8))
-            } else if has_delims && !has_count {
-                let size = inp.len();
-                if size <= 2 {
-                    panic!("Cannot handle misformatted compound str");
-                }
-                let mut fmt_str = String::new();
-                for (i, c) in inp.chars().enumerate() {
-                    if i == 0 || i == size - 1 {
-                        if !(is_open_delimiter(c) || is_close_delimiter(c)) {
-                            panic!(
-                                "Issue mapping out delimiter locations for compound with no count listing"
-                            );
-                        }
-                        continue;
-                    }
-                    fmt_str.push(c);
-                }
-                if fmt_str.is_empty() {
-                    panic!("No string detected within delimiters");
-                }
-                (fmt_str, None)
-            } else if has_delims && has_count {
-                let size = inp.len();
-                if size <= 2 {
-                    panic!("Cannot handle misformatted compound str");
-                }
-                let mut fmt_str = String::new();
-                let mut count: String = String::new();
-                let mut lhs_delim_count = 0;
-                let mut rhs_delim_count = 0;
-                for c in inp.chars() {
-                    // TODO: Check if open & close delims are the same type (brackets vs parens)
-                    if is_open_delimiter(c) {
-                        lhs_delim_count += 1;
-                    } else if is_close_delimiter(c) {
-                        rhs_delim_count += 1;
-                    } else if !c.is_digit(10) && count.is_empty() {
-                        fmt_str.push(c);
-                    } else if c.is_digit(10)
-                        && lhs_delim_count == rhs_delim_count
-                    {
-                        // Matching # of opening & closing delims
-                        count.push(c);
-                    } else if !count.is_empty() {
-                        panic!("XS string detected (extracting cmp str with delims and count)");
-                    }
-                }
-                if fmt_str.is_empty() {
-                    panic!("No string detected within delimiters");
-                }
-                if count.is_empty() {
-                    panic!("Count not found when searching around delims (nesting issues)")
-                }
-                let count_u8: u8 =
-                    count.parse().expect("Couldn't convert to u8");
-                (fmt_str, Some(count_u8))
-            } else {
-                panic!("Undefined behavior"); // Should never execute
-            }
-        }
-
-        assert!(self.has_side_chain(backbone_i), "Side chain was expected");
+        let side_chain = self
+            .side_chains
+            .get(&backbone_i)
+            .expect("Side chain not found");
         let mut q: LinkedList<String> = LinkedList::new();
         // queue
-        for (atom_str, i) in sorted(
-            self.side_chains
-                .get(&backbone_i)
-                .expect("Side chain was expected")
-                .iter()
-                .map(|&i| {
-                    (
-                        self.get_atom(i)
-                            .expect("Atom expected at side chain index")
-                            .to_string(),
-                        i,
-                    )
-                }),
-        ) {
+        for (atom_str, i) in sorted(side_chain.iter().map(|&i| {
+            (
+                self.get_atom(i)
+                    .expect("Atom expected at side chain index")
+                    .to_string(),
+                i,
+            )
+        })) {
             if !self.has_side_chain(i) && !q.is_empty() {
                 // push everything before to main string
                 // We have different atom, so we still need to append side chain for previous atom.
@@ -221,27 +219,25 @@ impl Compound {
             // append the remainder of the previous back to the end.
 
             // Append remainder of queue to string & flush queue
-            {
-                let count = q.len();
-                let q_str = q
-                    .pop_back()
-                    .expect("Error: Couldn't pop back of queue when assessing its length");
-
-                let one_letter = q_str.len() == 1;
-                if count == 1 && one_letter {
-                    write!(w, "{}", q_str)?;
-                } else if count == 1 {
-                    write!(w, "({})", q_str)?;
-                } else if one_letter {
-                    write!(w, "{}{}", q_str, count)?;
-                } else {
-                    write!(w, "({}){}", q_str, count)?;
-                }
-                q = LinkedList::new(); // resets queue
+            let count = q.len();
+            let q_str = q.pop_back().expect(
+                "Couldn't pop back of queue when assessing its length.",
+            );
+            let one_letter = q_str.len() == 1;
+            if count == 1 && one_letter {
+                write!(w, "{}", q_str)?;
+            } else if count == 1 {
+                write!(w, "({})", q_str)?;
+            } else if one_letter {
+                write!(w, "{}{}", q_str, count)?;
+            } else {
+                write!(w, "({}){}", q_str, count)?;
             }
+            q = LinkedList::new(); // reset queue
 
             // Current side chain str
-            let (cmp_str, count) = extract_cmp_str_and_count(&sc_str);
+            let (cmp_str, count) = extract_cmp_str_and_count(&sc_str)
+                .expect("extract_cmp_str_and_count failed.");
             // Pushes current side chain to queue
             if let Some(n) = count {
                 for _ in 0..n {
@@ -251,12 +247,8 @@ impl Compound {
                 q.push_back(cmp_str);
             }
         }
-        if !q.is_empty() {
-            let count = q.len();
-            let q_str = q.pop_back().expect(
-                "Error: Couldn't pop back of queue when assessing its length",
-            );
-
+        if let Some(q_str) = q.pop_back() {
+            let count = q.len() + 1;
             let one_letter = q_str.len() == 1;
             if count == 1 && one_letter {
                 write!(w, "{}", q_str)?;
@@ -281,7 +273,7 @@ impl fmt::Display for Compound {
                 .expect("Atom deleted from indexed");
             write!(f, "{}", atom)?;
             if self.has_side_chain(*i) {
-                let sc_length = self.get_sidechain_len(*i);
+                let sc_length = self.get_sidechain_len(*i).unwrap();
                 assert!(
                     sc_length != 0,
                     "Side chain length cannot be zero if it has a side chain."
@@ -298,11 +290,20 @@ impl fmt::Display for Compound {
     }
 }
 
+pub type CompoundResult<T> = Result<T, CompoundError>;
+
 #[allow(dead_code)]
 #[derive(thiserror::Error, Debug)]
 pub enum CompoundError {
-    #[error("Invalid Element received: `{0}`")]
-    InvalidElementError(String),
+    #[error("Compound Parsing Error: {0}")]
+    Parsing(String),
+    #[error("Unknown Error: {0}")]
+    Unknown(String),
+}
+
+#[inline]
+fn is_delimiter(c: char) -> bool {
+    is_open_delimiter(c) || is_close_delimiter(c)
 }
 
 #[inline]
@@ -315,12 +316,14 @@ fn is_close_delimiter(c: char) -> bool {
     c == ')' || c == ']'
 }
 
+#[allow(dead_code)]
 struct Token {
     str: String,
     pub count: u16,
     pub parts: Vec<Token>,
 }
 
+#[allow(dead_code)]
 impl Token {
     pub fn new(s: String) -> Self {
         Token {
@@ -357,6 +360,7 @@ fn get_element_count(iter: &mut Peekable<Chars>) -> u16 {
     count_str.parse::<u16>().unwrap_or(1)
 }
 
+#[allow(dead_code)]
 fn parse_into_tokens(
     iter: &mut Peekable<Chars>,
 ) -> Result<Vec<Token>, CompoundError> {
