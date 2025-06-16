@@ -2,7 +2,6 @@ use std::fmt;
 
 use super::element::Element;
 
-#[allow(unused)]
 #[derive(Clone, Debug, PartialEq)]
 pub struct Atom {
     element: Element,

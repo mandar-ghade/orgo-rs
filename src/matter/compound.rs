@@ -1,4 +1,3 @@
-use core::panic;
 use itertools::sorted;
 use std::{
     collections::{BTreeSet, HashMap, LinkedList},
@@ -39,90 +38,97 @@ fn extract_cmp_str_and_count(
 ) -> CompoundResult<(String, Option<u8>)> {
     let has_delims = inp.chars().any(|c| is_delimiter(c));
     let has_count = inp.chars().any(|c| c.is_digit(10));
-    if !has_delims && !has_count {
-        Ok((inp.to_owned(), None))
-    } else if !has_delims && has_count {
-        let mut fmt_str = String::new();
-        let mut count: String = String::new();
-        for c in inp.chars() {
-            if !c.is_digit(10) && count.is_empty() {
-                fmt_str.push(c);
-            } else if c.is_digit(10) {
-                count.push(c);
-            } else if !count.is_empty() {
+    match (has_delims, has_count) {
+        (false, false) => Ok((inp.to_owned(), None)),
+        (false, true) => {
+            // Count but no delimiters
+            let mut fmt_str = String::new();
+            let mut count = String::new();
+            for c in inp.chars() {
+                if c.is_digit(10) {
+                    count.push(c);
+                } else if count.is_empty() {
+                    fmt_str.push(c);
+                } else {
+                    return Err(CompoundError::Parsing(
+                        "XS string detected (extracting cmp str and count)"
+                            .into(),
+                    ));
+                }
+            }
+            let count: u8 = count
+                .parse()
+                .map_err(|_| CompoundError::Parsing("Invalid count.".into()))?;
+            Ok((fmt_str, Some(count)))
+        }
+        (true, false) => {
+            // Delimiters but no count
+            let size = inp.len();
+            if size <= 2 {
                 return Err(CompoundError::Parsing(
-                    "XS string detected (extracting cmp str and count)".into(),
+                    "Misformatted compound str".into(),
                 ));
             }
-        }
-        let count_u8: u8 = count
-            .parse()
-            .map_err(|_| CompoundError::Parsing("Invalid count.".into()))?;
-        Ok((fmt_str, Some(count_u8)))
-    } else if has_delims && !has_count {
-        let size = inp.len();
-        if size <= 2 {
-            return Err(CompoundError::Parsing(
-                "Misformatted compound str".into(),
-            ));
-        }
-        let mut fmt_str = String::new();
-        for (i, c) in inp.chars().enumerate() {
-            if i == 0 || i == size - 1 {
-                assert!(is_delimiter(c), "Issue mapping out delimiter locations for compound with no count listing.");
-                continue;
-            }
-            fmt_str.push(c);
-        }
-        if fmt_str.is_empty() {
-            return Err(CompoundError::Parsing(
-                "No string detected within delimiters.".into(),
-            ));
-        }
-        Ok((fmt_str, None))
-    } else if has_delims && has_count {
-        let size = inp.len();
-        if size <= 2 {
-            return Err(CompoundError::Parsing(
-                "Misformatted compound str.".into(),
-            ));
-        }
-        let mut fmt_str = String::new();
-        let mut count: String = String::new();
-        let mut lhs_delim_count = 0;
-        let mut rhs_delim_count = 0;
-        for c in inp.chars() {
-            // TODO: Check if open & close delims are the same type: [] vs ()
-            if is_open_delimiter(c) {
-                lhs_delim_count += 1;
-            } else if is_close_delimiter(c) {
-                rhs_delim_count += 1;
-            } else if !c.is_digit(10) && count.is_empty() {
+            let mut fmt_str = String::new();
+            for (i, c) in inp.chars().enumerate() {
+                if i == 0 || i == size - 1 {
+                    assert!(is_delimiter(c), "Issue mapping out delimiter locations for compound with no count listing.");
+                    continue;
+                }
                 fmt_str.push(c);
-            } else if c.is_digit(10) && lhs_delim_count == rhs_delim_count {
-                // Matching # of opening & closing delims
-                count.push(c);
-            } else if !count.is_empty() {
+            }
+            if fmt_str.is_empty() {
                 return Err(CompoundError::Parsing(
-                    "XS string detected (extracting cmp str and count)".into(),
+                    "No string detected within delimiters.".into(),
                 ));
             }
+            Ok((fmt_str, None))
         }
-        if fmt_str.is_empty() {
-            return Err(CompoundError::Parsing(
-                "No string detected within delimiters.".into(),
-            ));
+        (true, true) => {
+            // Both delimiters and a count
+            let size = inp.len();
+            if size <= 2 {
+                return Err(CompoundError::Parsing(
+                    "Misformatted compound str.".into(),
+                ));
+            }
+            let mut fmt_str = String::new();
+            let mut count = String::new();
+            let mut lhs_delim_count = 0;
+            let mut rhs_delim_count = 0;
+            for c in inp.chars() {
+                // TODO: Check if open & close delims match: () vs []
+                if is_open_delimiter(c) {
+                    lhs_delim_count += 1;
+                } else if is_close_delimiter(c) {
+                    rhs_delim_count += 1;
+                } else if c.is_digit(10) && lhs_delim_count == rhs_delim_count {
+                    // TODO: is this right? Shouldn't it be recursive?
+                    // Matching # of opening & closing delims
+                    count.push(c);
+                } else if count.is_empty() {
+                    fmt_str.push(c);
+                } else {
+                    return Err(CompoundError::Parsing(
+                        "XS string detected (extracting cmp str and count)"
+                            .into(),
+                    ));
+                }
+            }
+            if fmt_str.is_empty() {
+                return Err(CompoundError::Parsing(
+                    "No string detected within delimiters.".into(),
+                ));
+            }
+            assert!(
+                !count.is_empty(),
+                "Count not found when searching around delims (nesting issues)"
+            );
+            let count_u8: u8 = count
+                .parse()
+                .map_err(|_| CompoundError::Parsing("Invalid count.".into()))?;
+            Ok((fmt_str, Some(count_u8)))
         }
-        assert!(
-            !count.is_empty(),
-            "Count not found when searching around delims (nesting issues)"
-        );
-        let count_u8: u8 = count
-            .parse()
-            .map_err(|_| CompoundError::Parsing("Invalid count.".into()))?;
-        Ok((fmt_str, Some(count_u8)))
-    } else {
-        panic!("Undefined behavior"); // Should never execute
     }
 }
 
@@ -166,21 +172,16 @@ impl Compound {
             .expect("Side chain not found");
         let mut q: LinkedList<String> = LinkedList::new();
         // queue
-        for (atom_str, i) in sorted(side_chain.iter().map(|&i| {
-            (
-                self.get_atom(i)
-                    .expect("Atom expected at side chain index")
-                    .to_string(),
-                i,
-            )
-        })) {
+        for &i in sorted(side_chain) {
+            let atom_str = self
+                .get_atom(i)
+                .expect("Atom expected at side chain index")
+                .to_string();
             if !self.has_side_chain(i) && !q.is_empty() {
                 // push everything before to main string
                 // We have different atom, so we still need to append side chain for previous atom.
                 let count = q.len();
-                let q_str = q
-                    .pop_back()
-                    .expect("Error: Couldn't pop back of queue when assessing its length");
+                let q_str = q.pop_back().unwrap();
 
                 let one_letter = q_str.len() == 1;
                 if count == 1 && one_letter {
@@ -200,17 +201,13 @@ impl Compound {
                 continue;
             }
             let sc_str = self.side_chain_as_str(i)?;
-            if q.is_empty() {
+
+            let Some(q_front) = q.front() else {
                 q.push_back(atom_str);
                 continue;
-            }
-
+            };
             // q isn't empty, 4th case
-            if atom_str
-                == *q
-                    .front()
-                    .expect("Couldn't get front of LinkedList even though it wasn't empty")
-            {
+            if atom_str == *q_front {
                 q.push_back(atom_str);
                 continue;
             }
