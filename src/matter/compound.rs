@@ -9,26 +9,33 @@ use std::{
 use crate::{constants::ELEMENTS, matter::atom::Atom};
 
 #[derive(Clone, PartialEq, Debug, Hash, Eq)]
-struct Location {
-    x: u16,
-    y: u16,
+pub struct Location {
+    pub x: u16,
+    pub y: u16,
+}
+
+#[allow(dead_code)]
+impl Location {
+    pub fn new(x: u16, y: u16) -> Self {
+        Self { x, y }
+    }
 }
 
 #[derive(Clone, PartialEq, Debug)]
 /// Represents a Linear Compound
 pub struct Compound {
     /// Covalent Compound
-    atoms: Vec<Atom>,
+    pub atoms: Vec<Atom>,
     /// Each index represents the location of an atom
-    locations: Vec<Location>,
+    pub locations: Vec<Location>,
     /// From location, we can compute the Atom's index
-    location_to_idx: HashMap<Location, u8>,
+    pub location_to_idx: HashMap<Location, u8>,
     /// should theoretically be a size
-    backbone: Vec<u8>,
+    pub backbone: Vec<u8>,
     /// retains order
     /// ^ Side chains can have side-chains (unfortunately)
     /// ^ sort of like an undirected graph
-    side_chains: HashMap<u8, BTreeSet<u8>>,
+    pub side_chains: HashMap<u8, BTreeSet<u8>>,
     // TODO: Ensure values != key or backbone idx
 }
 // TODO: Pseudo-Dijkstra's longest chain implementation (using largest distance)
@@ -139,7 +146,7 @@ impl Compound {
 
     fn has_side_chain(&self, i: u8) -> bool {
         if let Some(side_chain) = self.side_chains.get(&i) {
-            side_chain.is_empty()
+            !side_chain.is_empty()
         } else {
             false
         }
@@ -386,7 +393,7 @@ fn parse_into_tokens(
 }
 
 impl Compound {
-    fn parse(_s: &str) -> Result<Self, CompoundError> {
+    pub fn parse(_s: &str) -> CompoundResult<Self> {
         todo!()
     }
 }
@@ -396,5 +403,37 @@ impl FromStr for Compound {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Compound::parse(s)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn compound_to_string_simple() {
+        let comp = Compound {
+            atoms: vec![
+                Atom::new(1).unwrap(),
+                Atom::new(2).unwrap(),
+                Atom::new(2).unwrap(),
+                Atom::new(3).unwrap(),
+            ],
+            locations: vec![
+                Location::new(1, 2),
+                Location::new(2, 3),
+                Location::new(2, 2),
+                Location::new(1, 3),
+            ],
+            location_to_idx: HashMap::from([
+                (Location::new(1, 2), 0),
+                (Location::new(2, 3), 1),
+                (Location::new(2, 2), 2),
+                (Location::new(1, 3), 3),
+            ]),
+            backbone: vec![0, 2],
+            side_chains: HashMap::from([(0, BTreeSet::from([1, 3]))]),
+        };
+        assert_eq!(comp.to_string(), "H(HeLi)He");
     }
 }
