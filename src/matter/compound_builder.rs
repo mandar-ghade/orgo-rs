@@ -75,12 +75,12 @@ impl CompoundBuilder {
         for i in 0..backbone_len {
             let loc_i = *locations.get(i).expect("Backbone loc not found");
             let remote_atoms = self.get_remote_side_chains(i as u8);
-            let choices = Vec::from([(-1, 0), (1, 0), (0, 1), (0, -1)]);
             // LEFT, RIGHT, UP, DOWN
-            let count_remote_atoms = remote_atoms.len();
-            if count_remote_atoms > 4 {
+            if remote_atoms.len() > 4 {
                 todo!("Expanded octet prohibited (for now)");
             }
+            let choices = Vec::from([(-1, 0), (1, 0), (0, 1), (0, -1)]);
+            // LEFT, RIGHT, UP, DOWN
             for (idx, _) in remote_atoms {
                 let valid_loc = choices.iter().find_map(|&(dx, dy)| {
                     let loc = loc_i.shift(dx, dy);
@@ -106,7 +106,7 @@ impl CompoundBuilder {
         self.location_to_idx = locations_to_idx;
     }
 
-    fn satisfy_backbone_octets(&mut self) -> () {
+    fn satisfy_backbone_octets(&mut self) {
         // ONLY for linear compound generation
         // Satisfy backbone octets
         let backbone_len = self.backbone.len();
