@@ -289,19 +289,19 @@ impl Compound {
 
 impl fmt::Display for Compound {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for i in self.backbone.iter() {
+        for &i in self.backbone.iter() {
             let atom = self
                 .atoms
-                .get(*i as usize)
+                .get(i as usize)
                 .expect("Atom deleted from indexed");
             write!(f, "{}", atom)?;
-            if self.has_side_chain(*i) {
-                let sc_length = self.get_sidechain_len(*i).unwrap();
+            if self.has_side_chain(i) {
+                let sc_length = self.get_sidechain_len(i).unwrap();
                 assert!(
                     sc_length != 0,
                     "Side chain length cannot be zero if it has a side chain."
                 );
-                let sc_str = self.side_chain_as_str(*i)?;
+                let sc_str = self.side_chain_as_str(i)?;
                 // TODO: Grouping
                 if sc_length != 1 {
                     write!(f, "({})", sc_str)?;
