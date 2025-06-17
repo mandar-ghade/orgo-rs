@@ -266,12 +266,8 @@ impl Compound {
             let (cmp_str, count) = extract_cmp_str_and_count(&sc_str)
                 .expect("extract_cmp_str_and_count failed.");
             // Pushes current side chain to queue
-            if let Some(n) = count {
-                for _ in 0..n {
-                    q.push_back(cmp_str.clone()); // lots of memory
-                }
-            } else {
-                q.push_back(cmp_str);
+            for _ in 0..count.unwrap_or(1) {
+                q.push_back(cmp_str.clone());
             }
         }
         if let Some(q_str) = q.pop_back() {
