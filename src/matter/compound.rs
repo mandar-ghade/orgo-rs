@@ -8,7 +8,7 @@ use std::{
 
 use crate::{constants::ELEMENTS, matter::atom::Atom};
 
-#[derive(Clone, Copy, PartialEq, Debug, Hash, Eq)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub struct Location {
     pub x: i16,
     pub y: i16,
@@ -32,17 +32,17 @@ impl Location {
 /// Represents a Linear Compound
 pub struct Compound {
     /// Covalent Compound
-    pub atoms: Vec<Atom>,
+    atoms: Vec<Atom>,
     /// Each index represents the location of an atom
-    pub locations: Vec<Location>,
+    locations: Vec<Location>,
     /// From location, we can compute the Atom's index
-    pub location_to_idx: HashMap<Location, u8>,
+    location_to_idx: HashMap<Location, u8>,
     /// should theoretically be a size
-    pub backbone: Vec<u8>,
+    backbone: Vec<u8>,
     /// retains order
     /// ^ Side chains can have side-chains (unfortunately)
     /// ^ sort of like an undirected graph
-    pub side_chains: HashMap<u8, BTreeSet<u8>>,
+    side_chains: HashMap<u8, BTreeSet<u8>>,
     // TODO: Ensure values != key or backbone idx
 }
 // TODO: Pseudo-Dijkstra's longest chain implementation (using largest distance)
@@ -434,10 +434,10 @@ mod tests {
     fn compound_to_string_simple() {
         let comp = Compound {
             atoms: vec![
-                Atom::new(1).unwrap(),
-                Atom::new(2).unwrap(),
-                Atom::new(2).unwrap(),
-                Atom::new(3).unwrap(),
+                Atom::new_unchecked(1),
+                Atom::new_unchecked(2),
+                Atom::new_unchecked(2),
+                Atom::new_unchecked(3),
             ],
             locations: vec![
                 Location::new(1, 2),

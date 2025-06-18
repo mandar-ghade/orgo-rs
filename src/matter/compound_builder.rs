@@ -1,8 +1,5 @@
 use std::collections::{BTreeSet, HashMap};
 
-use strum_macros::Display;
-use thiserror::Error;
-
 use crate::matter::{
     atom::Atom,
     compound::{Compound, Location},
@@ -25,7 +22,9 @@ pub struct CompoundBuilder {
     // TODO: Ensure values != key or backbone idx
 }
 
-#[derive(Error, Clone, Debug, Display)]
+pub type CompoundBuilderResult<T> = Result<T, CompoundBuilderError>;
+
+#[derive(thiserror::Error, strum_macros::Display, Clone, Debug)]
 pub enum CompoundBuilderError {
     LocationGenerationErr(String),
     SideChainErr(String),
@@ -60,33 +59,35 @@ impl CompoundBuilder {
     fn get_remote_side_chain(
         &self,
         atom_idx: u8,
-    ) -> Result<(u8, &Atom), CompoundBuilderError> {
+    ) -> CompoundBuilderResult<(u8, &Atom)> {
         Ok((
             atom_idx,
-            self.atoms
-                .get(atom_idx as usize)
-                .ok_or(CompoundBuilderError::SideChainErr(
-                    "Couldn't find adjacent atom to side chain. (CompoundBuilder issue)".into(),
-                ))?,
+            self.atoms.get(atom_idx as usize).ok_or(
+                CompoundBuilderError::SideChainErr(
+                    "Couldn't find adjacent atom to side chain.".into(),
+                ),
+            )?,
         ))
     }
 
     fn get_remote_side_chains(
         &self,
         idx: u8,
-    ) -> Result<Vec<(u8, &Atom)>, CompoundBuilderError> {
+    ) -> CompoundBuilderResult<Vec<(u8, &Atom)>> {
         // Returns directly adjacent atoms to backbone atom
         // (not entire side chains)
         // TODO: Rework for larger chains
-        self.side_chains
-            .get(&idx)
-            .unwrap_or(&BTreeSet::new())
-            .iter()
-            .map(|&i| self.get_remote_side_chain(i))
-            .collect()
+        if let Some(side_chain) = self.side_chains.get(&idx) {
+            side_chain
+                .iter()
+                .map(|&i| self.get_remote_side_chain(i))
+                .collect()
+        } else {
+            Ok(Vec::new())
+        }
     }
 
-    fn gen_locations(&mut self) -> Result<(), CompoundBuilderError> {
+    fn gen_locations(&mut self) -> CompoundBuilderResult<()> {
         // Called after octets are completed.
         let mut locations = Vec::new();
         let mut locations_to_idx = HashMap::new();
@@ -99,7 +100,7 @@ impl CompoundBuilder {
         for i in 0..backbone_len {
             let loc_i = *locations.get(i).ok_or_else(|| {
                 CompoundBuilderError::LocationGenerationErr(
-                    "Backbone loc not found (CompoundBuilder issue)".into(),
+                    "Backbone loc not found.".into(),
                 )
             })?;
             let remote_atoms = self.get_remote_side_chains(i as u8)?;
@@ -159,8 +160,7 @@ impl CompoundBuilder {
                 .map(|c| c.len())
                 .unwrap_or(0);
             while primary_chain_atoms + side_chain_len < 4 {
-                let atom = Atom::new(1).unwrap();
-                self.atoms.push(atom);
+                self.atoms.push(Atom::hydrogen());
                 self.side_chains
                     .entry(i as u8)
                     .or_default()
@@ -189,12 +189,12 @@ impl CompoundBuilder {
     pub fn linear_chain(
         &mut self,
         count: u8,
-    ) -> Result<&mut Self, CompoundBuilderError> {
+    ) -> CompoundBuilderResult<&mut Self> {
         self.atoms.clear();
         self.backbone.clear();
         for i in 0..count {
             self.backbone.push(i);
-            self.atoms.push(Atom::new(6).unwrap());
+            self.atoms.push(Atom::carbon());
         }
         self.side_chains.clear();
         self.satisfy_backbone_octets();
