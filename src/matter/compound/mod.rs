@@ -1,3 +1,5 @@
+pub mod builder;
+
 use itertools::sorted;
 use std::{
     collections::{BTreeSet, HashMap, LinkedList},

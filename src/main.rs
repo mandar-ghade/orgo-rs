@@ -1,4 +1,5 @@
-use matter::compound_builder::CompoundBuilder;
+use crate::matter::compound::builder::CompoundBuilder;
+
 mod constants;
 mod matter;
 
