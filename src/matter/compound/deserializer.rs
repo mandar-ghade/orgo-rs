@@ -9,16 +9,14 @@ pub enum Chain {
 }
 
 impl Chain {
-    fn reversed(&self) -> Chain {
+    fn reversed(self) -> Chain {
         // Reverses order of chain
-        match self.clone().group().minimize(1) {
+        match self.group().minimize(1) {
             Self::KV(k, v) => Self::KV(k, v),
-            Self::Vec(v, c) => {
-                let mut reversed_vec = v.clone();
-                reversed_vec.reverse();
-                reversed_vec =
-                    reversed_vec.iter().map(|i| i.reversed()).collect();
-                Self::Vec(reversed_vec, c).group().minimize(1)
+            Self::Vec(mut v, c) => {
+                v.reverse();
+                v = v.into_iter().map(|i| i.reversed()).collect();
+                Self::Vec(v, c).group().minimize(1)
             }
         }
     }
@@ -310,7 +308,7 @@ mod tests {
         .reversed();
         assert_eq!(
             methane.to_string(),
-            "H4C".to_string(),
+            "H4C",
             "Compound reversing doesn't work"
         );
     }
