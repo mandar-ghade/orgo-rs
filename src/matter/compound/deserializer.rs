@@ -48,8 +48,22 @@ impl Chain {
         }
     }
 
-    fn minimize(&self) {
+    fn minimize(&self, factor: usize) -> Self {
         // Convert redundant single-sized vectors into KV (if ATOM).
+        //
+        // Factor = 1 should be default
+        match self {
+            Self::KV(k, v) => Self::KV(k.clone(), *v * factor),
+            Self::Vec(v, c) => {
+                if v.len() != 1 {
+                    self.clone()
+                } else {
+                    v.first()
+                        .expect("First should've been found")
+                        .minimize(*c * factor)
+                }
+            }
+        }
     }
 
     fn str(&self) -> String {
@@ -101,18 +115,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn simple_grouping_test() {
-        // ((H5H5)(H5H5)) => ((H10)2)
+    fn simple_grouping_and_minimize_test() {
+        // ((H5H5)(H5H5)) => H20
         let inner = Chain::Vec(
             Vec::from([Chain::KV("H".into(), 5), Chain::KV("H".into(), 5)]),
             1,
         );
         let outer = Vec::from([inner.clone(), inner]);
-        let lhs = Chain::Vec(outer, 1).group();
-        let rhs = Chain::Vec(
-            Vec::from([Chain::Vec(Vec::from([Chain::KV("H".into(), 10)]), 2)]),
-            1,
-        );
-        assert_eq!(lhs, rhs, "Grouping does not function correctly.")
+        let lhs = Chain::Vec(outer, 1).group().minimize(1);
+        let rhs = Chain::KV("H".into(), 20);
+        assert_eq!(
+            lhs, rhs,
+            "Grouping & minimizing dont not function correctly."
+        )
     }
 }
