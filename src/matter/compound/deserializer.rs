@@ -10,6 +10,20 @@ pub enum Chain {
 
 #[allow(dead_code)]
 impl Chain {
+    fn reversed(&self) -> Chain {
+        // Reverses order of chain
+        match self.group().minimize(1) {
+            Self::KV(k, v) => Self::KV(k, v),
+            Self::Vec(v, c) => {
+                let mut reversed_vec = v.clone();
+                reversed_vec.reverse();
+                reversed_vec =
+                    reversed_vec.iter().map(|i| i.reversed()).collect();
+                Self::Vec(reversed_vec, c).group().minimize(1)
+            }
+        }
+    }
+
     fn incr_count_by(&mut self, count: usize) {
         match self {
             Self::Vec(_, c) => *c += count,
@@ -234,6 +248,7 @@ mod tests {
 
     #[test]
     fn condense_butane() {
+        // CH3(CH2)(CH2)CH3 => CH3(CH2)2CH3
         let terminal_cs = Chain::Vec(
             Vec::from([Chain::KV("C".into(), 1), Chain::KV("H".into(), 3)]),
             1,
@@ -261,7 +276,6 @@ mod tests {
     #[test]
     fn condense_1_4_butanediol() {
         // TODO: Make a function that creates a linear chain for Chain
-        // TODO: Make reversed side chain function
         //
         // HOCH2CH2CH2CH2OH => HO(CH2)4OH
         let hydroxyl_1 = Chain::Vec(
@@ -292,5 +306,19 @@ mod tests {
             "HO(CH2)4OH",
             "Could not condense 1,4-butanediol into chemical formula"
         )
+    }
+
+    #[test]
+    fn test_reverse_with_methane() {
+        let methane = Chain::Vec(
+            Vec::from([Chain::KV("C".into(), 1), Chain::KV("H".into(), 4)]),
+            1,
+        )
+        .reversed();
+        assert_eq!(
+            methane.to_string(),
+            "H4C".to_string(),
+            "Compound reversing doesn't work"
+        );
     }
 }
