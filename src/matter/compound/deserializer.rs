@@ -1,7 +1,4 @@
-use std::{
-    collections::{BTreeSet, HashSet},
-    fmt,
-};
+use std::fmt;
 
 #[derive(Clone, Debug)]
 pub enum Chain {
@@ -33,11 +30,10 @@ impl Chain {
                 let mut new_vec: Vec<Chain> = Vec::new();
                 for curr_chain in chains.iter() {
                     let curr = curr_chain.group().clone(); // Recursion yay
-                    if new_vec.iter().any(|c| c.custom_eq(&curr)) {
-                        let last = new_vec
-                            .last_mut()
-                            .expect("Last chain should've been expected");
-                        last.incr_count_by(curr.get_count());
+                    if let Some(matched) =
+                        new_vec.iter_mut().find(|c| c.custom_eq(&curr))
+                    {
+                        matched.incr_count_by(curr.get_count());
                     } else {
                         new_vec.push(curr);
                     }
@@ -48,8 +44,8 @@ impl Chain {
         }
     }
 
-    fn minimize(&self, factor: usize) -> Self {
-        // Convert redundant single-sized vectors into KV (if ATOM).
+    pub fn minimize(&self, factor: usize) -> Self {
+        // Convert redundant single-sized vectors into KV (ATOM).
         //
         // Factor = 1 should be default
         match self {
@@ -67,7 +63,41 @@ impl Chain {
     }
 
     fn str(&self) -> String {
-        todo!()
+        let minimized = self.group().minimize(1);
+        match minimized {
+            Self::KV(k, v) => {
+                if v == 1 {
+                    k
+                } else {
+                    format!("{}{}", k, v)
+                }
+            }
+            Self::Vec(v, count) => {
+                match (count, v.len()) {
+                    // Vec len != 1 due to minimization
+                    (_, 0) => {
+                        panic!("Vec cannot have length 0");
+                    }
+                    (1, 1) => {
+                        panic!("Grouping & minimalization aren't working correctly");
+                    }
+                    (_, 1) => {
+                        panic!("Minimalization isn't working correctly");
+                    }
+                    (_, _) => {
+                        let mut output_str = String::new();
+                        for i in v.iter() {
+                            output_str.push_str(&i.str())
+                        }
+                        if count == 1 {
+                            output_str
+                        } else {
+                            format!("({}){}", output_str, count)
+                        }
+                    }
+                }
+            }
+        }
     }
 
     fn custom_eq(&self, other: &Self) -> bool {
@@ -128,5 +158,24 @@ mod tests {
             lhs, rhs,
             "Grouping & minimizing aren't functioning correctly."
         )
+    }
+
+    #[test]
+    fn condensed_formula_grouping_test() {
+        // (H20I2I5H33)2 => (H53I7)2
+        let chain = Chain::Vec(
+            Vec::from([
+                Chain::KV("H".into(), 20),
+                Chain::KV("I".into(), 2),
+                Chain::KV("I".into(), 5),
+                Chain::KV("H".into(), 33),
+            ]),
+            2,
+        );
+        assert_eq!(
+            chain.to_string(),
+            "(H53I7)2".to_string(),
+            "Formula is not properly condensed."
+        );
     }
 }
