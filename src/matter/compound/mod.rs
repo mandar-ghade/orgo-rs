@@ -170,6 +170,18 @@ impl Compound {
         self.atoms.get(i)
     }
 
+    fn get_atom_unsafe(&self, idx: usize) -> &Atom {
+        if let Some(atom) = self.atoms.get(idx) {
+            atom
+        } else {
+            panic!(
+                "Invalid atom index: {} (length is {})",
+                idx,
+                self.atoms.len(),
+            );
+        }
+    }
+
     fn has_side_chain(&self, i: usize) -> bool {
         if let Some(side_chain) = self.side_chains.get(&i) {
             !side_chain.is_empty()
@@ -178,12 +190,10 @@ impl Compound {
         }
     }
 
-    fn get_sidechain_len(&self, backbone_i: usize) -> CompoundResult<usize> {
-        let side_chain =
-            self.side_chains.get(&backbone_i).ok_or_else(|| {
-                CompoundError::Unknown("Side chain not found.".into())
-            })?;
-        Ok(side_chain.len())
+    fn get_sidechain_len(&self, backbone_i: usize) -> Option<usize> {
+        self.side_chains
+            .get(&backbone_i)
+            .map(|side_chain| side_chain.len())
     }
 
     fn side_chain_as_str(
@@ -208,8 +218,7 @@ impl Compound {
             .side_chains
             .get(&backbone_i)
             .expect("Side chain not found");
-        let mut q: LinkedList<String> = LinkedList::new();
-        // queue
+        let mut q = LinkedList::<String>::new();
         for &i in sorted(side_chain) {
             let atom_str = self
                 .get_atom(i)

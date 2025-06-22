@@ -10,18 +10,27 @@ pub enum Chain {
 }
 
 impl Chain {
-    fn reversed(self) -> Chain {
-        // Reverses order of chain
-        match self.group().minimize(1) {
-            Self::KV(k, v) => Self::KV(k, v),
-            Self::Vec(mut v, c) => {
+    /// Reverses order of chain
+    fn reverse(&mut self) {
+        match self {
+            Self::KV(_, _) => {}
+            Self::Vec(v, _) => {
                 v.reverse();
-                v = v.into_iter().map(|i| i.reversed()).collect();
-                Self::Vec(v, c).group().minimize(1)
+                for chain in v.iter_mut() {
+                    chain.reverse();
+                }
             }
         }
     }
 
+    /// Returns a new Chain with the order reversed
+    #[allow(dead_code)]
+    fn reversed(mut self) -> Self {
+        self.reverse();
+        self
+    }
+
+    /// Increments the count of the chain
     fn incr_count_by(&mut self, count: usize) {
         match self {
             Self::Vec(_, c) => *c += count,
@@ -60,10 +69,7 @@ impl Chain {
         }
     }
 
-    pub fn minimize(self, factor: usize) -> Self {
-        // Convert redundant single-sized vectors into KV (ATOM).
-        //
-        // Factor = 1 should be default
+    fn minimize_by_factor(self, factor: usize) -> Self {
         match self {
             Self::KV(s, c) => Self::KV(s, c * factor),
             Self::Vec(ref v, c) => {
@@ -73,14 +79,18 @@ impl Chain {
                     v.first()
                         .expect("First should've been found")
                         .clone()
-                        .minimize(c * factor)
+                        .minimize_by_factor(c * factor)
                 }
             }
         }
     }
 
+    pub fn minimize(self) -> Self {
+        self.minimize_by_factor(1)
+    }
+
     fn write_to<W: Write>(&self, w: &mut W) -> fmt::Result {
-        match self.clone().group().minimize(1) {
+        match self.clone().group().minimize() {
             Self::KV(s, c) => {
                 if c == 1 {
                     write!(w, "{}", s)?;
@@ -125,31 +135,22 @@ impl Chain {
         }
     }
 
-    fn deserialize_side_chain(cmp: &Compound, i: usize) -> Self {
+    fn from_atom(cmp: &Compound, i: usize) -> Self {
         assert!(
             cmp.has_side_chain(i),
             "Compound must have side chain to deserialize it."
         );
-        let mut v: Vec<Chain> = Vec::new();
-
-        v.push(Self::KV(
-            cmp.get_atom(i).expect("Atom expected").to_string(),
-            1,
-        ));
+        let mut chains = Vec::new();
+        chains.push(Self::KV(cmp.get_atom_unsafe(i).to_string(), 1));
         let side_chain = cmp.get_sidechain_unsafe(i);
         for &j in side_chain {
             if cmp.has_side_chain(j) {
-                v.push(Self::deserialize_side_chain(cmp, j));
+                chains.push(Self::from_atom(cmp, j));
             } else {
-                v.push(Self::KV(
-                    cmp.get_atom(j)
-                        .expect("Atom expected while deserializing")
-                        .to_string(),
-                    1,
-                ));
+                chains.push(Self::KV(cmp.get_atom_unsafe(j).to_string(), 1));
             }
         }
-        Self::Vec(v, 1)
+        Self::Vec(chains, 1)
     }
 }
 
@@ -182,15 +183,12 @@ impl From<Compound> for Chain {
         let mut vec: Vec<Self> = Vec::new();
         for &i in val.backbone.iter() {
             if val.has_side_chain(i) {
-                vec.push(Self::deserialize_side_chain(&val, i)); // Self::Vec
+                vec.push(Self::from_atom(&val, i));
             } else {
-                vec.push(Self::KV(
-                    val.get_atom(i).expect("Atom expected").to_string(),
-                    1,
-                ));
+                vec.push(Self::KV(val.get_atom_unsafe(i).to_string(), 1));
             }
         }
-        Self::Vec(vec, 1).group().minimize(1)
+        Self::Vec(vec, 1).group().minimize()
     }
 }
 
@@ -208,7 +206,7 @@ mod tests {
             1,
         );
         let outer = Vec::from([inner.clone(), inner]);
-        let lhs = Chain::Vec(outer, 1).group().minimize(1);
+        let lhs = Chain::Vec(outer, 1).group().minimize();
         let rhs = Chain::KV("H".into(), 20);
         assert_eq!(
             lhs, rhs,
@@ -369,7 +367,6 @@ mod tests {
             Deserialize functionality",
             )
             .build();
-        let hexane_deserialized: Chain = hexane.into();
-        assert_eq!(hexane_deserialized.to_string(), "CH3(CH2)4CH3")
+        assert_eq!(Chain::from(hexane).to_string(), "CH3(CH2)4CH3")
     }
 }

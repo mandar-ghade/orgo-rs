@@ -61,29 +61,22 @@ impl CompoundBuilder {
             atom
         } else {
             panic!(
-                "Invalid atom index: {} (max index is {})",
+                "Invalid atom index: {} (length is {})",
                 idx,
-                if self.atoms.len() > 0 {
-                    self.atoms.len() - 1
-                } else {
-                    0
-                }
+                self.atoms.len(),
             );
         }
     }
 
+    #[allow(dead_code)]
     fn get_location_unsafe(&self, idx: usize) -> Location {
         if let Some(&loc) = self.locations.get(idx) {
             loc
         } else {
             panic!(
-                "Invalid location index: {} (max index is {})",
+                "Invalid location index: {} (length is {})",
                 idx,
-                if self.locations.len() > 0 {
-                    self.locations.len() - 1
-                } else {
-                    0
-                }
+                self.locations.len(),
             );
         }
     }
