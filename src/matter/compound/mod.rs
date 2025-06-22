@@ -38,20 +38,20 @@ pub struct Compound {
     /// Each index represents the location of an atom
     locations: Vec<Location>,
     /// From location, we can compute the Atom's index
-    location_to_idx: HashMap<Location, u8>,
+    location_to_idx: HashMap<Location, usize>,
     /// should theoretically be a size
-    backbone: Vec<u8>,
+    backbone: Vec<usize>,
     /// retains order
     /// ^ Side chains can have side-chains (unfortunately)
     /// ^ sort of like an undirected graph
-    side_chains: HashMap<u8, BTreeSet<u8>>,
+    side_chains: HashMap<usize, BTreeSet<usize>>,
     // TODO: Ensure values != key or backbone idx
 }
 // TODO: Pseudo-Dijkstra's longest chain implementation (using largest distance)
 
 fn extract_cmp_str_and_count(
     inp: &String,
-) -> CompoundResult<(String, Option<u8>)> {
+) -> CompoundResult<(String, Option<usize>)> {
     let has_delims = inp.chars().any(|c| is_delimiter(c));
     let has_count = inp.chars().any(|c| c.is_digit(10));
     match (has_delims, has_count) {
@@ -72,7 +72,7 @@ fn extract_cmp_str_and_count(
                     ));
                 }
             }
-            let count: u8 = count
+            let count: usize = count
                 .parse()
                 .map_err(|_| CompoundError::Parsing("Invalid count.".into()))?;
             Ok((fmt_str, Some(count)))
@@ -140,10 +140,10 @@ fn extract_cmp_str_and_count(
                 !count.is_empty(),
                 "Count not found when searching around delims (nesting issues)"
             );
-            let count_u8: u8 = count
-                .parse()
+            let count = count
+                .parse::<usize>()
                 .map_err(|_| CompoundError::Parsing("Invalid count.".into()))?;
-            Ok((fmt_str, Some(count_u8)))
+            Ok((fmt_str, Some(count)))
         }
     }
 }
@@ -152,9 +152,9 @@ impl Compound {
     pub fn new(
         atoms: Vec<Atom>,
         locations: Vec<Location>,
-        location_to_idx: HashMap<Location, u8>,
-        backbone: Vec<u8>,
-        side_chains: HashMap<u8, BTreeSet<u8>>,
+        location_to_idx: HashMap<Location, usize>,
+        backbone: Vec<usize>,
+        side_chains: HashMap<usize, BTreeSet<usize>>,
     ) -> Self {
         Self {
             atoms,
@@ -165,11 +165,11 @@ impl Compound {
         }
     }
 
-    fn get_atom(&self, i: u8) -> Option<&Atom> {
-        self.atoms.get(i as usize)
+    fn get_atom(&self, i: usize) -> Option<&Atom> {
+        self.atoms.get(i)
     }
 
-    fn has_side_chain(&self, i: u8) -> bool {
+    fn has_side_chain(&self, i: usize) -> bool {
         if let Some(side_chain) = self.side_chains.get(&i) {
             !side_chain.is_empty()
         } else {
@@ -177,17 +177,18 @@ impl Compound {
         }
     }
 
-    fn get_sidechain_len(&self, backbone_i: u8) -> CompoundResult<u8> {
+    fn get_sidechain_len(&self, backbone_i: usize) -> CompoundResult<usize> {
         let side_chain =
             self.side_chains.get(&backbone_i).ok_or_else(|| {
                 CompoundError::Unknown("Side chain not found.".into())
             })?;
-        side_chain.len().try_into().map_err(|_| {
-            CompoundError::Unknown("Invalid side chain length.".into())
-        })
+        Ok(side_chain.len())
     }
 
-    fn side_chain_as_str(&self, backbone_i: u8) -> Result<String, fmt::Error> {
+    fn side_chain_as_str(
+        &self,
+        backbone_i: usize,
+    ) -> Result<String, fmt::Error> {
         let mut s = String::new();
         self.write_side_chain(&mut s, backbone_i)?;
         Ok(s)
@@ -196,7 +197,7 @@ impl Compound {
     fn write_side_chain<W: fmt::Write>(
         &self,
         w: &mut W,
-        backbone_i: u8,
+        backbone_i: usize,
     ) -> fmt::Result {
         let side_chain = self
             .side_chains
@@ -211,7 +212,8 @@ impl Compound {
                 .to_string();
             if !self.has_side_chain(i) && !q.is_empty() {
                 // push everything before to main string
-                // We have different atom, so we still need to append side chain for previous atom.
+                // We have different atom, so we still need to append
+                // side chain for previous atom.
                 let count = q.len();
                 let q_str = q.pop_back().unwrap();
 
@@ -244,8 +246,9 @@ impl Compound {
                 continue;
             }
 
-            // most important case, we have different atom with a side chain, while we also need to
-            // append the remainder of the previous back to the end.
+            // most important case, we have different atom with a side chain,
+            // while we also need to append the remainder of the previous
+            // back to the end.
 
             // Append remainder of queue to string & flush queue
             let count = q.len();
@@ -292,10 +295,7 @@ impl Compound {
 impl fmt::Display for Compound {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for &i in self.backbone.iter() {
-            let atom = self
-                .atoms
-                .get(i as usize)
-                .expect("Atom deleted from indexed");
+            let atom = self.atoms.get(i).expect("Atom deleted from indexed");
             write!(f, "{}", atom)?;
             if self.has_side_chain(i) {
                 let sc_length = self.get_sidechain_len(i).unwrap();

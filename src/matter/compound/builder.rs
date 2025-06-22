@@ -12,13 +12,13 @@ pub struct CompoundBuilder {
     /// Each index represents the location of an atom
     locations: Vec<Location>,
     /// From location, we can compute the Atom's index
-    location_to_idx: HashMap<Location, u8>,
+    location_to_idx: HashMap<Location, usize>,
     /// should theoretically be a size
-    backbone: Vec<u8>,
+    backbone: Vec<usize>,
     /// retains order
     /// ^ Side chains can have side-chains (unfortunately)
     /// ^ sort of like an undirected graph
-    side_chains: HashMap<u8, BTreeSet<u8>>,
+    side_chains: HashMap<usize, BTreeSet<usize>>,
     // TODO: Ensure values != key or backbone idx
 }
 
@@ -48,7 +48,7 @@ impl CompoundBuilder {
     }
 
     #[allow(dead_code)]
-    fn has_side_chain(&self, idx: u8) -> bool {
+    fn has_side_chain(&self, idx: usize) -> bool {
         if let Some(side_chain) = self.side_chains.get(&idx) {
             !side_chain.is_empty()
         } else {
@@ -58,11 +58,11 @@ impl CompoundBuilder {
 
     fn get_remote_side_chain(
         &self,
-        atom_idx: u8,
-    ) -> CompoundBuilderResult<(u8, &Atom)> {
+        atom_idx: usize,
+    ) -> CompoundBuilderResult<(usize, &Atom)> {
         Ok((
             atom_idx,
-            self.atoms.get(atom_idx as usize).ok_or(
+            self.atoms.get(atom_idx).ok_or(
                 CompoundBuilderError::SideChainErr(
                     "Couldn't find adjacent atom to side chain.".into(),
                 ),
@@ -72,8 +72,8 @@ impl CompoundBuilder {
 
     fn get_remote_side_chains(
         &self,
-        idx: u8,
-    ) -> CompoundBuilderResult<Vec<(u8, &Atom)>> {
+        idx: usize,
+    ) -> CompoundBuilderResult<Vec<(usize, &Atom)>> {
         // Returns directly adjacent atoms to backbone atom
         // (not entire side chains)
         // TODO: Rework for larger chains
@@ -103,7 +103,7 @@ impl CompoundBuilder {
                     "Backbone loc not found.".into(),
                 )
             })?;
-            let remote_atoms = self.get_remote_side_chains(i as u8)?;
+            let remote_atoms = self.get_remote_side_chains(i)?;
             if remote_atoms.len() > 4 {
                 todo!("Expanded octet prohibited (for now)");
             }
@@ -124,7 +124,7 @@ impl CompoundBuilder {
                             .into(),
                     ));
                 };
-                if locations.len() != idx as usize {
+                if locations.len() != idx {
                     return Err(CompoundBuilderError::LocationGenerationErr(
                         "Location vector length - remote atom's index mismatch"
                             .into(),
@@ -143,7 +143,7 @@ impl CompoundBuilder {
         // ONLY for linear compound generation
         // Satisfy backbone octets
         let backbone_len = self.backbone.len();
-        let mut working_idx = backbone_len as u8;
+        let mut working_idx = backbone_len;
         for i in 0..backbone_len {
             let mut primary_chain_atoms = 0;
             if i < backbone_len - 1 {
@@ -154,23 +154,14 @@ impl CompoundBuilder {
                 // something comes before it
                 primary_chain_atoms += 1;
             }
-            let mut side_chain_len = self
-                .side_chains
-                .get(&(i as u8))
-                .map(|c| c.len())
-                .unwrap_or(0);
+            let mut side_chain_len =
+                self.side_chains.get(&i).map(|c| c.len()).unwrap_or(0);
             while primary_chain_atoms + side_chain_len < 4 {
                 self.atoms.push(Atom::hydrogen());
-                self.side_chains
-                    .entry(i as u8)
-                    .or_default()
-                    .insert(working_idx);
+                self.side_chains.entry(i).or_default().insert(working_idx);
                 working_idx += 1;
-                side_chain_len = self
-                    .side_chains
-                    .get(&(i as u8))
-                    .map(|c| c.len())
-                    .unwrap_or(0);
+                side_chain_len =
+                    self.side_chains.get(&i).map(|c| c.len()).unwrap_or(0);
                 // I could simplify this line
             }
         }
@@ -188,7 +179,7 @@ impl CompoundBuilder {
 
     pub fn linear_chain(
         &mut self,
-        count: u8,
+        count: usize,
     ) -> CompoundBuilderResult<&mut Self> {
         self.atoms.clear();
         self.backbone.clear();
