@@ -195,6 +195,10 @@ impl Compound {
         Ok(s)
     }
 
+    fn get_sidechain_unsafe(&self, i: usize) -> &BTreeSet<usize> {
+        self.side_chains.get(&i).expect("Side chain not found")
+    }
+
     fn write_side_chain<W: fmt::Write>(
         &self,
         w: &mut W,

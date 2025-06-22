@@ -1,5 +1,6 @@
 use std::fmt::{self, Write};
 
+use crate::matter::compound::Compound;
 #[derive(Clone, Debug)]
 pub enum Chain {
     /// Compound
@@ -123,6 +124,33 @@ impl Chain {
             (_, _) => false,
         }
     }
+
+    fn deserialize_side_chain(cmp: &Compound, i: usize) -> Self {
+        assert!(
+            cmp.has_side_chain(i),
+            "Compound must have side chain to deserialize it."
+        );
+        let mut v: Vec<Chain> = Vec::new();
+
+        v.push(Self::KV(
+            cmp.get_atom(i).expect("Atom expected").to_string(),
+            1,
+        ));
+        let side_chain = cmp.get_sidechain_unsafe(i);
+        for &j in side_chain {
+            if cmp.has_side_chain(j) {
+                v.push(Self::deserialize_side_chain(cmp, j));
+            } else {
+                v.push(Self::KV(
+                    cmp.get_atom(j)
+                        .expect("Atom expected while deserializing")
+                        .to_string(),
+                    1,
+                ));
+            }
+        }
+        Self::Vec(v, 1)
+    }
 }
 
 impl PartialEq for Chain {
@@ -149,8 +177,27 @@ impl fmt::Display for Chain {
     }
 }
 
+impl From<Compound> for Chain {
+    fn from(val: Compound) -> Self {
+        let mut vec: Vec<Self> = Vec::new();
+        for &i in val.backbone.iter() {
+            if val.has_side_chain(i) {
+                vec.push(Self::deserialize_side_chain(&val, i)); // Self::Vec
+            } else {
+                vec.push(Self::KV(
+                    val.get_atom(i).expect("Atom expected").to_string(),
+                    1,
+                ));
+            }
+        }
+        Self::Vec(vec, 1).group().minimize(1)
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use crate::matter::compound::builder::CompoundBuilder;
+
     use super::*;
 
     #[test]
@@ -311,5 +358,18 @@ mod tests {
             "H4C",
             "Compound reversing doesn't work"
         );
+    }
+
+    #[test]
+    fn test_compound_to_string() {
+        let hexane: Compound = CompoundBuilder::new()
+            .linear_chain(6)
+            .expect(
+                "Linear chain expected while evaluating
+            Deserialize functionality",
+            )
+            .build();
+        let hexane_deserialized: Chain = hexane.into();
+        assert_eq!(hexane_deserialized.to_string(), "CH3(CH2)4CH3")
     }
 }

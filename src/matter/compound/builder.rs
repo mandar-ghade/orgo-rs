@@ -63,7 +63,11 @@ impl CompoundBuilder {
             panic!(
                 "Invalid atom index: {} (max index is {})",
                 idx,
-                self.atoms.len() - 1
+                if self.atoms.len() > 0 {
+                    self.atoms.len() - 1
+                } else {
+                    0
+                }
             );
         }
     }
@@ -75,7 +79,11 @@ impl CompoundBuilder {
             panic!(
                 "Invalid location index: {} (max index is {})",
                 idx,
-                self.locations.len() - 1
+                if self.locations.len() > 0 {
+                    self.locations.len() - 1
+                } else {
+                    0
+                }
             );
         }
     }
@@ -113,7 +121,7 @@ impl CompoundBuilder {
             locations_to_idx.insert(loc, i);
         });
         for i in 0..backbone_len {
-            let base_loc = self.get_location_unsafe(i);
+            let base_loc = *locations.get(i).expect("Backbone loc not found.");
             let remote_atoms = self.get_remote_side_chains(i)?;
             if remote_atoms.len() > 4 {
                 todo!("Expanded octet prohibited (for now)");
@@ -198,7 +206,7 @@ impl CompoundBuilder {
             self.atoms.push(Atom::carbon());
             self.backbone.push(i);
         }
-        self.side_chains.clear();
+        // self.side_chains.clear();
         self.satisfy_backbone_octets();
         self.gen_locations()?;
         Ok(self)
