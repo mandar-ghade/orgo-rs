@@ -11,7 +11,7 @@ pub enum Chain {
 impl Chain {
     fn reversed(&self) -> Chain {
         // Reverses order of chain
-        match self.group().minimize(1) {
+        match self.clone().group().minimize(1) {
             Self::KV(k, v) => Self::KV(k, v),
             Self::Vec(v, c) => {
                 let mut reversed_vec = v.clone();
