@@ -26,8 +26,7 @@ pub type CompoundBuilderResult<T> = Result<T, CompoundBuilderError>;
 
 #[derive(thiserror::Error, strum_macros::Display, Clone, Debug)]
 pub enum CompoundBuilderError {
-    LocationGenerationErr(String),
-    SideChainErr(String),
+    SideChainError(String),
 }
 
 impl CompoundBuilder {
@@ -56,18 +55,29 @@ impl CompoundBuilder {
         }
     }
 
-    fn get_remote_side_chain(
-        &self,
-        atom_idx: usize,
-    ) -> CompoundBuilderResult<(usize, &Atom)> {
-        Ok((
-            atom_idx,
-            self.atoms.get(atom_idx).ok_or(
-                CompoundBuilderError::SideChainErr(
-                    "Couldn't find adjacent atom to side chain.".into(),
-                ),
-            )?,
-        ))
+    #[allow(dead_code)]
+    fn get_atom_unsafe(&self, idx: usize) -> &Atom {
+        if let Some(atom) = self.atoms.get(idx) {
+            atom
+        } else {
+            panic!(
+                "Invalid atom index: {} (max index is {})",
+                idx,
+                self.atoms.len() - 1
+            );
+        }
+    }
+
+    fn get_location_unsafe(&self, idx: usize) -> Location {
+        if let Some(&loc) = self.locations.get(idx) {
+            loc
+        } else {
+            panic!(
+                "Invalid location index: {} (max index is {})",
+                idx,
+                self.locations.len() - 1
+            );
+        }
     }
 
     fn get_remote_side_chains(
@@ -77,14 +87,19 @@ impl CompoundBuilder {
         // Returns directly adjacent atoms to backbone atom
         // (not entire side chains)
         // TODO: Rework for larger chains
-        if let Some(side_chain) = self.side_chains.get(&idx) {
-            side_chain
-                .iter()
-                .map(|&i| self.get_remote_side_chain(i))
-                .collect()
-        } else {
-            Ok(Vec::new())
+        let Some(side_chain) = self.side_chains.get(&idx) else {
+            return Ok(Vec::new());
+        };
+        let mut chains = Vec::new();
+        for &i in side_chain {
+            let atom = self.atoms.get(i).ok_or(
+                CompoundBuilderError::SideChainError(
+                    "Couldn't find adjacent atom to side chain.".into(),
+                ),
+            )?;
+            chains.push((i, atom));
         }
+        Ok(chains)
     }
 
     fn gen_locations(&mut self) -> CompoundBuilderResult<()> {
@@ -98,11 +113,7 @@ impl CompoundBuilder {
             locations_to_idx.insert(loc, i);
         });
         for i in 0..backbone_len {
-            let loc_i = *locations.get(i).ok_or_else(|| {
-                CompoundBuilderError::LocationGenerationErr(
-                    "Backbone loc not found.".into(),
-                )
-            })?;
+            let base_loc = self.get_location_unsafe(i);
             let remote_atoms = self.get_remote_side_chains(i)?;
             if remote_atoms.len() > 4 {
                 todo!("Expanded octet prohibited (for now)");
@@ -110,26 +121,26 @@ impl CompoundBuilder {
             let choices = Vec::from([(-1, 0), (1, 0), (0, 1), (0, -1)]);
             // LEFT, RIGHT, UP, DOWN
             for (idx, _) in remote_atoms {
-                let valid_loc = choices.iter().find_map(|&(dx, dy)| {
-                    let loc = loc_i.shift(dx, dy);
-                    if locations_to_idx.contains_key(&loc) {
-                        None // invalid because taken
-                    } else {
-                        Some(loc)
-                    }
-                });
-                let Some(side_chain_loc) = valid_loc else {
-                    return Err(CompoundBuilderError::SideChainErr(
-                        "Location assignment failed (octet likely exceed for side chain atom)"
-                            .into(),
-                    ));
-                };
-                if locations.len() != idx {
-                    return Err(CompoundBuilderError::LocationGenerationErr(
-                        "Location vector length - remote atom's index mismatch"
-                            .into(),
-                    ));
-                }
+                let side_chain_loc = choices
+                    .iter()
+                    .find_map(|&(dx, dy)| {
+                        let loc = base_loc.shift(dx, dy);
+                        if locations_to_idx.contains_key(&loc) {
+                            None // invalid because taken
+                        } else {
+                            Some(loc)
+                        }
+                    })
+                    .ok_or_else(|| {
+                        CompoundBuilderError::SideChainError(
+                            // octet likely exceed for side chain atom
+                            "Location assignment failed".into(),
+                        )
+                    })?;
+                assert!(
+                    locations.len() == idx,
+                    "Location vector length - remote atom's index mismatch",
+                );
                 locations.push(side_chain_loc.clone());
                 locations_to_idx.insert(side_chain_loc, idx);
             }
@@ -184,8 +195,8 @@ impl CompoundBuilder {
         self.atoms.clear();
         self.backbone.clear();
         for i in 0..count {
-            self.backbone.push(i);
             self.atoms.push(Atom::carbon());
+            self.backbone.push(i);
         }
         self.side_chains.clear();
         self.satisfy_backbone_octets();
