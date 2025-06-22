@@ -126,7 +126,7 @@ mod tests {
         let rhs = Chain::KV("H".into(), 20);
         assert_eq!(
             lhs, rhs,
-            "Grouping & minimizing dont not function correctly."
+            "Grouping & minimizing aren't functioning correctly."
         )
     }
 }
