@@ -29,11 +29,15 @@ impl Chain {
             Self::Vec(chains, count) => {
                 let mut new_vec: Vec<Chain> = Vec::new();
                 for curr_chain in chains.iter() {
-                    let curr = curr_chain.group().clone(); // Recursion yay
-                    if let Some(matched) =
-                        new_vec.iter_mut().find(|c| c.custom_eq(&curr))
-                    {
-                        matched.incr_count_by(curr.get_count());
+                    let curr = curr_chain.group().clone();
+                    // Vec ordering implies connectivity.
+                    // Connects side chains together
+                    if let Some(matched) = new_vec.last_mut() {
+                        if matched.custom_eq(&curr) {
+                            matched.incr_count_by(curr.get_count());
+                        } else {
+                            new_vec.push(curr);
+                        }
                     } else {
                         new_vec.push(curr);
                     }
@@ -162,13 +166,13 @@ mod tests {
 
     #[test]
     fn condensed_formula_grouping_test() {
-        // (H20I2I5H33)2 => (H53I7)2
+        // (H20H33I2I5)2 => (H53I7)2
         let chain = Chain::Vec(
             Vec::from([
                 Chain::KV("H".into(), 20),
+                Chain::KV("H".into(), 33),
                 Chain::KV("I".into(), 2),
                 Chain::KV("I".into(), 5),
-                Chain::KV("H".into(), 33),
             ]),
             2,
         );
@@ -226,5 +230,31 @@ mod tests {
             "HOC(CH3)3",
             "Tert-butanol doesn't condense correctly"
         );
+    }
+
+    #[test]
+    fn condense_butane() {
+        let terminal_cs = Chain::Vec(
+            Vec::from([Chain::KV("C".into(), 1), Chain::KV("H".into(), 3)]),
+            1,
+        );
+        let middle_cs = Chain::Vec(
+            Vec::from([Chain::KV("C".into(), 1), Chain::KV("H".into(), 2)]),
+            1,
+        );
+        let chain = Chain::Vec(
+            Vec::from([
+                terminal_cs.clone(),
+                middle_cs.clone(),
+                middle_cs,
+                terminal_cs,
+            ]),
+            1,
+        );
+        assert_eq!(
+            chain.to_string(),
+            "CH3(CH2)2CH3".to_string(),
+            "Failed to condense butane"
+        )
     }
 }
