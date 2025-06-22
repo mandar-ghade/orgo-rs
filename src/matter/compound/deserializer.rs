@@ -178,4 +178,53 @@ mod tests {
             "Formula is not properly condensed."
         );
     }
+
+    #[test]
+    fn condense_tert_butanol() {
+        // HOC((CH3)(CH3)(CH3)) => HOC(CH3)3
+        let chain = Chain::Vec(
+            Vec::from([
+                Chain::Vec(
+                    Vec::from([
+                        Chain::KV("H".into(), 1),
+                        Chain::KV("O".into(), 1),
+                    ]),
+                    1,
+                ),
+                Chain::KV("C".into(), 1),
+                Chain::Vec(
+                    Vec::from([
+                        Chain::Vec(
+                            Vec::from([
+                                Chain::KV("C".into(), 1),
+                                Chain::KV("H".into(), 3),
+                            ]),
+                            1,
+                        ),
+                        Chain::Vec(
+                            Vec::from([
+                                Chain::KV("C".into(), 1),
+                                Chain::KV("H".into(), 3),
+                            ]),
+                            1,
+                        ),
+                        Chain::Vec(
+                            Vec::from([
+                                Chain::KV("C".into(), 1),
+                                Chain::KV("H".into(), 3),
+                            ]),
+                            1,
+                        ),
+                    ]),
+                    1,
+                ),
+            ]),
+            1,
+        );
+        assert_eq!(
+            chain.to_string(),
+            "HOC(CH3)3",
+            "Tert-butanol doesn't condense correctly"
+        );
+    }
 }
