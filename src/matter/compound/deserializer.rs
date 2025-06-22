@@ -235,40 +235,30 @@ mod tests {
 
     #[test]
     fn condense_tert_butanol() {
-        // HOC((CH3)(CH3)(CH3)) => HOC(CH3)3
+        // HOC(CH3)(CH3)(CH3) => HOC(CH3)3
         let chain = Chain::Vec(
             Vec::from([
-                Chain::Vec(
-                    Vec::from([
-                        Chain::KV("H".into(), 1),
-                        Chain::KV("O".into(), 1),
-                    ]),
-                    1,
-                ),
+                Chain::KV("H".into(), 1),
+                Chain::KV("O".into(), 1),
                 Chain::KV("C".into(), 1),
                 Chain::Vec(
                     Vec::from([
-                        Chain::Vec(
-                            Vec::from([
-                                Chain::KV("C".into(), 1),
-                                Chain::KV("H".into(), 3),
-                            ]),
-                            1,
-                        ),
-                        Chain::Vec(
-                            Vec::from([
-                                Chain::KV("C".into(), 1),
-                                Chain::KV("H".into(), 3),
-                            ]),
-                            1,
-                        ),
-                        Chain::Vec(
-                            Vec::from([
-                                Chain::KV("C".into(), 1),
-                                Chain::KV("H".into(), 3),
-                            ]),
-                            1,
-                        ),
+                        Chain::KV("C".into(), 1),
+                        Chain::KV("H".into(), 3),
+                    ]),
+                    1,
+                ),
+                Chain::Vec(
+                    Vec::from([
+                        Chain::KV("C".into(), 1),
+                        Chain::KV("H".into(), 3),
+                    ]),
+                    1,
+                ),
+                Chain::Vec(
+                    Vec::from([
+                        Chain::KV("C".into(), 1),
+                        Chain::KV("H".into(), 3),
                     ]),
                     1,
                 ),
@@ -311,8 +301,6 @@ mod tests {
 
     #[test]
     fn condense_1_4_butanediol() {
-        // TODO: Make a function that creates a linear chain for Chain
-        //
         // HOCH2CH2CH2CH2OH => HO(CH2)4OH
         let hydroxyl_1 = Chain::Vec(
             Vec::from([Chain::KV("H".into(), 1), Chain::KV("O".into(), 1)]),
