@@ -257,4 +257,40 @@ mod tests {
             "Failed to condense butane"
         )
     }
+
+    #[test]
+    fn condense_1_4_butanediol() {
+        // TODO: Make a function that creates a linear chain for Chain
+        // TODO: Make reversed side chain function
+        //
+        // HOCH2CH2CH2CH2OH => HO(CH2)4OH
+        let hydroxyl_1 = Chain::Vec(
+            Vec::from([Chain::KV("H".into(), 1), Chain::KV("O".into(), 1)]),
+            1,
+        );
+        let hydroxyl_4 = Chain::Vec(
+            Vec::from([Chain::KV("O".into(), 1), Chain::KV("H".into(), 1)]),
+            1,
+        );
+        let methylene = Chain::Vec(
+            Vec::from([Chain::KV("C".into(), 1), Chain::KV("H".into(), 2)]),
+            1,
+        );
+        let chain = Chain::Vec(
+            Vec::from([
+                hydroxyl_1,
+                methylene.clone(),
+                methylene.clone(),
+                methylene.clone(),
+                methylene,
+                hydroxyl_4,
+            ]),
+            1,
+        );
+        assert_eq!(
+            chain.to_string(),
+            "HO(CH2)4OH",
+            "Could not condense 1,4-butanediol into chemical formula"
+        )
+    }
 }
