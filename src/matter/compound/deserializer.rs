@@ -178,17 +178,17 @@ impl fmt::Display for Chain {
     }
 }
 
-impl From<Compound> for Chain {
-    fn from(val: Compound) -> Self {
-        let mut vec: Vec<Self> = Vec::new();
+impl From<&Compound> for Chain {
+    fn from(val: &Compound) -> Self {
+        let mut chains = Vec::new();
         for &i in val.backbone.iter() {
             if val.has_side_chain(i) {
-                vec.push(Self::from_atom(&val, i));
+                chains.push(Self::from_atom(&val, i));
             } else {
-                vec.push(Self::KV(val.get_atom_unsafe(i).to_string(), 1));
+                chains.push(Self::KV(val.get_atom_unsafe(i).to_string(), 1));
             }
         }
-        Self::Vec(vec, 1).group().minimize()
+        Self::Vec(chains, 1).group().minimize()
     }
 }
 
@@ -355,6 +355,6 @@ mod tests {
             Deserialize functionality",
             )
             .build();
-        assert_eq!(Chain::from(hexane).to_string(), "CH3(CH2)4CH3")
+        assert_eq!(Chain::from(&hexane).to_string(), "CH3(CH2)4CH3")
     }
 }

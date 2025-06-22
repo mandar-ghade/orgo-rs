@@ -9,7 +9,10 @@ use std::{
     str::{Chars, FromStr},
 };
 
-use crate::{constants::ELEMENTS, matter::atom::Atom};
+use crate::{
+    constants::ELEMENTS,
+    matter::{atom::Atom, compound::deserializer::Chain},
+};
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub struct Location {
@@ -49,105 +52,6 @@ pub struct Compound {
     // TODO: Ensure values != key or backbone idx
 }
 // TODO: Pseudo-Dijkstra's longest chain implementation (using largest distance)
-
-fn extract_cmp_str_and_count(
-    inp: &String,
-) -> CompoundResult<(String, Option<usize>)> {
-    let has_delims = inp.chars().any(|c| is_delimiter(c));
-    let has_count = inp.chars().any(|c| c.is_digit(10));
-    match (has_delims, has_count) {
-        (false, false) => Ok((inp.to_owned(), None)),
-        (false, true) => {
-            // Count but no delimiters
-            let mut fmt_str = String::new();
-            let mut count = String::new();
-            for c in inp.chars() {
-                if c.is_digit(10) {
-                    count.push(c);
-                } else if count.is_empty() {
-                    fmt_str.push(c);
-                } else {
-                    return Err(CompoundError::Parsing(
-                        "XS string detected (extracting cmp str and count)"
-                            .into(),
-                    ));
-                }
-            }
-            let count: usize = count
-                .parse()
-                .map_err(|_| CompoundError::Parsing("Invalid count.".into()))?;
-            Ok((fmt_str, Some(count)))
-        }
-        (true, false) => {
-            // Delimiters but no count
-            let size = inp.len();
-            if size <= 2 {
-                return Err(CompoundError::Parsing(
-                    "Misformatted compound str".into(),
-                ));
-            }
-            let mut fmt_str = String::new();
-            for (i, c) in inp.chars().enumerate() {
-                if i == 0 || i == size - 1 {
-                    assert!(is_delimiter(c), "Issue mapping out delimiter locations for compound with no count listing.");
-                    continue;
-                }
-                fmt_str.push(c);
-            }
-            if fmt_str.is_empty() {
-                return Err(CompoundError::Parsing(
-                    "No string detected within delimiters.".into(),
-                ));
-            }
-            Ok((fmt_str, None))
-        }
-        (true, true) => {
-            // Both delimiters and a count
-            let size = inp.len();
-            if size <= 2 {
-                return Err(CompoundError::Parsing(
-                    "Misformatted compound str.".into(),
-                ));
-            }
-            let mut fmt_str = String::new();
-            let mut count = String::new();
-            let mut lhs_delim_count = 0;
-            let mut rhs_delim_count = 0;
-            for c in inp.chars() {
-                // TODO: Check if open & close delims match: () vs []
-                if is_open_delimiter(c) {
-                    lhs_delim_count += 1;
-                } else if is_close_delimiter(c) {
-                    rhs_delim_count += 1;
-                } else if c.is_digit(10) && lhs_delim_count == rhs_delim_count {
-                    // TODO: is this right? Shouldn't it be recursive?
-                    // Matching # of opening & closing delims
-                    count.push(c);
-                } else if count.is_empty() {
-                    fmt_str.push(c);
-                } else {
-                    return Err(CompoundError::Parsing(
-                        "XS string detected (extracting cmp str and count)"
-                            .into(),
-                    ));
-                }
-            }
-            if fmt_str.is_empty() {
-                return Err(CompoundError::Parsing(
-                    "No string detected within delimiters.".into(),
-                ));
-            }
-            assert!(
-                !count.is_empty(),
-                "Count not found when searching around delims (nesting issues)"
-            );
-            let count = count
-                .parse::<usize>()
-                .map_err(|_| CompoundError::Parsing("Invalid count.".into()))?;
-            Ok((fmt_str, Some(count)))
-        }
-    }
-}
 
 impl Compound {
     pub fn new(
@@ -190,143 +94,14 @@ impl Compound {
         }
     }
 
-    fn get_sidechain_len(&self, backbone_i: usize) -> Option<usize> {
-        self.side_chains
-            .get(&backbone_i)
-            .map(|side_chain| side_chain.len())
-    }
-
-    fn side_chain_as_str(
-        &self,
-        backbone_i: usize,
-    ) -> Result<String, fmt::Error> {
-        let mut s = String::new();
-        self.write_side_chain(&mut s, backbone_i)?;
-        Ok(s)
-    }
-
     fn get_sidechain_unsafe(&self, i: usize) -> &BTreeSet<usize> {
         self.side_chains.get(&i).expect("Side chain not found")
-    }
-
-    fn write_side_chain<W: fmt::Write>(
-        &self,
-        w: &mut W,
-        backbone_i: usize,
-    ) -> fmt::Result {
-        let side_chain = self
-            .side_chains
-            .get(&backbone_i)
-            .expect("Side chain not found");
-        let mut q = LinkedList::<String>::new();
-        for &i in sorted(side_chain) {
-            let atom_str = self
-                .get_atom(i)
-                .expect("Atom expected at side chain index")
-                .to_string();
-            if !self.has_side_chain(i) && !q.is_empty() {
-                // push everything before to main string
-                // We have different atom, so we still need to append
-                // side chain for previous atom.
-                let count = q.len();
-                let q_str = q.pop_back().unwrap();
-
-                let one_letter = q_str.len() == 1;
-                if count == 1 && one_letter {
-                    write!(w, "{}", q_str)?;
-                } else if count == 1 {
-                    write!(w, "({})", q_str)?;
-                } else if one_letter {
-                    write!(w, "{}{}", q_str, count)?;
-                } else {
-                    write!(w, "({}){}", q_str, count)?;
-                }
-                q = LinkedList::new(); // resets queue
-                write!(w, "{}", atom_str)?;
-                continue;
-            } else if !self.has_side_chain(i) {
-                write!(w, "{}", atom_str)?;
-                continue;
-            }
-            let sc_str = self.side_chain_as_str(i)?;
-
-            let Some(q_front) = q.front() else {
-                q.push_back(atom_str);
-                continue;
-            };
-            // q isn't empty, 4th case
-            if atom_str == *q_front {
-                q.push_back(atom_str);
-                continue;
-            }
-
-            // most important case, we have different atom with a side chain,
-            // while we also need to append the remainder of the previous
-            // back to the end.
-
-            // Append remainder of queue to string & flush queue
-            let count = q.len();
-            let q_str = q.pop_back().expect(
-                "Couldn't pop back of queue when assessing its length.",
-            );
-            let one_letter = q_str.len() == 1;
-            if count == 1 && one_letter {
-                write!(w, "{}", q_str)?;
-            } else if count == 1 {
-                write!(w, "({})", q_str)?;
-            } else if one_letter {
-                write!(w, "{}{}", q_str, count)?;
-            } else {
-                write!(w, "({}){}", q_str, count)?;
-            }
-            q = LinkedList::new(); // reset queue
-
-            // Current side chain str
-            let (cmp_str, count) = extract_cmp_str_and_count(&sc_str)
-                .expect("extract_cmp_str_and_count failed.");
-            // Pushes current side chain to queue
-            for _ in 0..count.unwrap_or(1) {
-                q.push_back(cmp_str.clone());
-            }
-        }
-        if let Some(q_str) = q.pop_back() {
-            let count = q.len() + 1;
-            let one_letter = q_str.len() == 1;
-            if count == 1 && one_letter {
-                write!(w, "{}", q_str)?;
-            } else if count == 1 {
-                write!(w, "({})", q_str)?;
-            } else if one_letter {
-                write!(w, "{}{}", q_str, count)?;
-            } else {
-                write!(w, "({}){}", q_str, count)?;
-            }
-        }
-        Ok(())
     }
 }
 
 impl fmt::Display for Compound {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for &i in self.backbone.iter() {
-            let atom = self.atoms.get(i).expect("Atom deleted from indexed");
-            write!(f, "{}", atom)?;
-            if self.has_side_chain(i) {
-                let sc_length = self.get_sidechain_len(i).unwrap();
-                assert!(
-                    sc_length != 0,
-                    "Side chain length cannot be zero if it has a side chain."
-                );
-                let sc_str = self.side_chain_as_str(i)?;
-                // TODO: Grouping
-                if sc_length != 1 {
-                    write!(f, "({})", sc_str)?;
-                } else {
-                    write!(f, "{}", sc_str)?;
-                }
-            }
-        }
-        Ok(())
+        f.write_str(&Chain::from(self).to_string())
     }
 }
 
@@ -470,6 +245,6 @@ mod tests {
             backbone: vec![0, 2],
             side_chains: HashMap::from([(0, BTreeSet::from([1, 3]))]),
         };
-        assert_eq!(comp.to_string(), "H(HeLi)He");
+        assert_eq!(comp.to_string(), "HHeLiHe");
     }
 }
