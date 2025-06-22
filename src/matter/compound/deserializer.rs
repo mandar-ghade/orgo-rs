@@ -1,14 +1,13 @@
-use std::fmt;
+use std::fmt::{self, Write};
 
 #[derive(Clone, Debug)]
 pub enum Chain {
-    /// COMPOUND
+    /// Compound
     Vec(Vec<Chain>, usize),
-    /// ATOMS
+    /// Atoms
     KV(String, usize),
 }
 
-#[allow(dead_code)]
 impl Chain {
     fn reversed(&self) -> Chain {
         // Reverses order of chain
@@ -38,95 +37,89 @@ impl Chain {
         }
     }
 
-    pub fn group(&self) -> Self {
+    pub fn group(self) -> Self {
         match self {
             Self::Vec(chains, count) => {
-                let mut new_vec: Vec<Chain> = Vec::new();
-                for curr_chain in chains.iter() {
-                    let curr = curr_chain.group().clone();
+                let mut new_chains = Vec::<Chain>::new();
+                for chain in chains {
+                    let curr = chain.clone().group();
                     // Vec ordering implies connectivity.
                     // Connects side chains together
-                    if let Some(matched) = new_vec.last_mut() {
+                    if let Some(matched) = new_chains.last_mut() {
                         if matched.custom_eq(&curr) {
                             matched.incr_count_by(curr.get_count());
                         } else {
-                            new_vec.push(curr);
+                            new_chains.push(curr);
                         }
                     } else {
-                        new_vec.push(curr);
+                        new_chains.push(curr);
                     }
                 }
-                Self::Vec(new_vec, *count)
+                Self::Vec(new_chains, count)
             }
-            Self::KV(_, _) => self.clone(),
+            Self::KV(_, _) => self,
         }
     }
 
-    pub fn minimize(&self, factor: usize) -> Self {
+    pub fn minimize(self, factor: usize) -> Self {
         // Convert redundant single-sized vectors into KV (ATOM).
         //
         // Factor = 1 should be default
         match self {
-            Self::KV(k, v) => Self::KV(k.clone(), *v * factor),
-            Self::Vec(v, c) => {
+            Self::KV(s, c) => Self::KV(s, c * factor),
+            Self::Vec(ref v, c) => {
                 if v.len() != 1 {
-                    self.clone()
+                    self
                 } else {
                     v.first()
                         .expect("First should've been found")
-                        .minimize(*c * factor)
+                        .clone()
+                        .minimize(c * factor)
                 }
             }
         }
     }
 
-    fn str(&self) -> String {
-        let minimized = self.group().minimize(1);
-        match minimized {
-            Self::KV(k, v) => {
-                if v == 1 {
-                    k
+    fn write_to<W: Write>(&self, w: &mut W) -> fmt::Result {
+        match self.clone().group().minimize(1) {
+            Self::KV(s, c) => {
+                if c == 1 {
+                    write!(w, "{}", s)?;
                 } else {
-                    format!("{}{}", k, v)
+                    write!(w, "{}{}", s, c)?;
                 }
             }
             Self::Vec(v, count) => {
-                match (count, v.len()) {
-                    // Vec len != 1 due to minimization
-                    (_, 0) => {
-                        panic!("Vec cannot have length 0");
-                    }
-                    (1, 1) => {
+                assert!(!v.is_empty());
+                if v.len() == 1 {
+                    if count == 1 {
                         panic!("Grouping & minimalization aren't working correctly");
-                    }
-                    (_, 1) => {
+                    } else {
                         panic!("Minimalization isn't working correctly");
                     }
-                    (_, _) => {
-                        let mut output_str = String::new();
-                        for i in v.iter() {
-                            output_str.push_str(&i.str())
-                        }
-                        if count == 1 {
-                            output_str
-                        } else {
-                            format!("({}){}", output_str, count)
-                        }
-                    }
+                }
+                if count != 1 {
+                    write!(w, "(")?;
+                }
+                for chain in v {
+                    chain.write_to(w)?;
+                }
+                if count != 1 {
+                    write!(w, "){}", count)?;
                 }
             }
         }
+        Ok(())
     }
 
     fn custom_eq(&self, other: &Self) -> bool {
         // IF vec, check everything is same
         // If KV, check that identities are the same (Atoms)
-        //
         // We have two implementations of equality, a custom equality and a full equality
         match (self, other) {
-            (Self::KV(k_lhs, _), Self::KV(k_rhs, _)) => {
+            (Self::KV(s_left, _), Self::KV(s_right, _)) => {
                 // Counts DO NOT matter (non-vec comparison)
-                k_lhs == k_rhs
+                s_left == s_right
             }
             (Self::Vec(_, _), Self::Vec(_, _)) => self == other, // EXACT checks
             (_, _) => false,
@@ -153,8 +146,8 @@ impl PartialEq for Chain {
 }
 
 impl fmt::Display for Chain {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.str())
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.write_to(f)
     }
 }
 
@@ -192,7 +185,7 @@ mod tests {
         );
         assert_eq!(
             chain.to_string(),
-            "(H53I7)2".to_string(),
+            "(H53I7)2",
             "Formula is not properly condensed."
         );
     }
@@ -268,7 +261,7 @@ mod tests {
         );
         assert_eq!(
             chain.to_string(),
-            "CH3(CH2)2CH3".to_string(),
+            "CH3(CH2)2CH3",
             "Failed to condense butane"
         )
     }
