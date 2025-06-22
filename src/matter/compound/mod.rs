@@ -1,4 +1,5 @@
 pub mod builder;
+pub mod deserializer;
 
 use itertools::sorted;
 use std::{
