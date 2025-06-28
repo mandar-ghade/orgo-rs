@@ -34,6 +34,8 @@ impl Location {
     }
 }
 
+pub struct SimpleCompound {}
+
 #[derive(Clone, PartialEq, Debug)]
 /// Represents a Linear Compound
 pub struct Compound {

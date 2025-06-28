@@ -1,15 +1,21 @@
-use std::fmt::{self, Write};
+use crate::matter::{atom::Atom, compound::Compound};
+use std::fmt::{self, Display, Write};
 
-use crate::matter::compound::Compound;
 #[derive(Clone, Debug)]
-pub enum Chain {
+pub enum Chain<T>
+where
+    T: Display + Clone + PartialEq,
+{
     /// Compound
-    Vec(Vec<Chain>, usize),
+    Vec(Vec<Chain<T>>, usize),
     /// Atoms
-    KV(String, usize),
+    KV(T, usize),
 }
 
-impl Chain {
+impl<T> Chain<T>
+where
+    T: Display + Clone + PartialEq,
+{
     /// Reverses order of chain
     fn reverse(&mut self) {
         match self {
@@ -48,7 +54,7 @@ impl Chain {
     pub fn group(self) -> Self {
         match self {
             Self::Vec(chains, count) => {
-                let mut new_chains = Vec::<Chain>::new();
+                let mut new_chains = Vec::<Chain<T>>::new();
                 for chain in chains {
                     let curr = chain.clone().group();
                     // Vec ordering implies connectivity.
@@ -134,27 +140,12 @@ impl Chain {
             (_, _) => false,
         }
     }
-
-    fn from_atom(cmp: &Compound, i: usize) -> Self {
-        assert!(
-            cmp.has_side_chain(i),
-            "Compound must have side chain to deserialize it."
-        );
-        let mut chains = Vec::new();
-        chains.push(Self::KV(cmp.get_atom_unsafe(i).to_string(), 1));
-        let side_chain = cmp.get_sidechain_unsafe(i);
-        for &j in side_chain {
-            if cmp.has_side_chain(j) {
-                chains.push(Self::from_atom(cmp, j));
-            } else {
-                chains.push(Self::KV(cmp.get_atom_unsafe(j).to_string(), 1));
-            }
-        }
-        Self::Vec(chains, 1)
-    }
 }
 
-impl PartialEq for Chain {
+impl<T> PartialEq for Chain<T>
+where
+    T: Display + Clone + PartialEq,
+{
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::KV(k_lhs, v_lhs), Self::KV(k_rhs, v_rhs)) => {
@@ -172,20 +163,43 @@ impl PartialEq for Chain {
     }
 }
 
-impl fmt::Display for Chain {
+impl<T> fmt::Display for Chain<T>
+where
+    T: Display + Clone + PartialEq,
+{
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         self.write_to(f)
     }
 }
 
-impl From<&Compound> for Chain {
+impl Chain<Atom> {
+    fn from_atom(cmp: &Compound, i: usize) -> Self {
+        assert!(
+            cmp.has_side_chain(i),
+            "Compound must have side chain to deserialize it."
+        );
+        let mut chains = Vec::new();
+        chains.push(Self::KV(cmp.get_atom_unsafe(i).clone(), 1));
+        let side_chain = cmp.get_sidechain_unsafe(i);
+        for &j in side_chain {
+            if cmp.has_side_chain(j) {
+                chains.push(Self::from_atom(cmp, j));
+            } else {
+                chains.push(Self::KV(cmp.get_atom_unsafe(j).clone(), 1));
+            }
+        }
+        Self::Vec(chains, 1)
+    }
+}
+
+impl From<&Compound> for Chain<Atom> {
     fn from(val: &Compound) -> Self {
         let mut chains = Vec::new();
         for &i in val.backbone.iter() {
             if val.has_side_chain(i) {
-                chains.push(Self::from_atom(&val, i));
+                chains.push(Self::from_atom(val, i));
             } else {
-                chains.push(Self::KV(val.get_atom_unsafe(i).to_string(), 1));
+                chains.push(Self::KV(val.get_atom_unsafe(i).clone(), 1));
             }
         }
         Self::Vec(chains, 1).group().minimize()
@@ -201,7 +215,7 @@ mod tests {
     #[test]
     fn simple_grouping_and_minimize_test() {
         // ((H5H5)(H5H5)) => H20
-        let inner = Chain::Vec(
+        let inner: Chain<String> = Chain::Vec(
             Vec::from([Chain::KV("H".into(), 5), Chain::KV("H".into(), 5)]),
             1,
         );
@@ -217,7 +231,7 @@ mod tests {
     #[test]
     fn condensed_formula_grouping_test() {
         // (H20H33I2I5)2 => (H53I7)2
-        let chain = Chain::Vec(
+        let chain: Chain<String> = Chain::Vec(
             Vec::from([
                 Chain::KV("H".into(), 20),
                 Chain::KV("H".into(), 33),
@@ -236,7 +250,7 @@ mod tests {
     #[test]
     fn condense_tert_butanol() {
         // HOC(CH3)(CH3)(CH3) => HOC(CH3)3
-        let chain = Chain::Vec(
+        let chain: Chain<String> = Chain::Vec(
             Vec::from([
                 Chain::KV("H".into(), 1),
                 Chain::KV("O".into(), 1),
@@ -275,7 +289,7 @@ mod tests {
     #[test]
     fn condense_butane() {
         // CH3(CH2)(CH2)CH3 => CH3(CH2)2CH3
-        let terminal_cs = Chain::Vec(
+        let terminal_cs: Chain<String> = Chain::Vec(
             Vec::from([Chain::KV("C".into(), 1), Chain::KV("H".into(), 3)]),
             1,
         );
@@ -302,7 +316,7 @@ mod tests {
     #[test]
     fn condense_1_4_butanediol() {
         // HOCH2CH2CH2CH2OH => HO(CH2)4OH
-        let hydroxyl_1 = Chain::Vec(
+        let hydroxyl_1: Chain<String> = Chain::Vec(
             Vec::from([Chain::KV("H".into(), 1), Chain::KV("O".into(), 1)]),
             1,
         );
@@ -334,7 +348,7 @@ mod tests {
 
     #[test]
     fn test_reverse_with_methane() {
-        let methane = Chain::Vec(
+        let methane: Chain<String> = Chain::Vec(
             Vec::from([Chain::KV("C".into(), 1), Chain::KV("H".into(), 4)]),
             1,
         )
@@ -356,5 +370,22 @@ mod tests {
             )
             .build();
         assert_eq!(Chain::from(&hexane).to_string(), "CH3(CH2)4CH3")
+    }
+
+    #[test]
+    fn test_compound_to_string_using_atoms() {
+        let chain = Chain::Vec(
+            Vec::from([
+                Chain::KV(Atom::carbon(), 1),
+                Chain::KV(Atom::hydrogen(), 3),
+                Chain::KV(Atom::new_unchecked(35), 1),
+            ]),
+            1,
+        );
+        assert_eq!(
+            chain.to_string(),
+            "CH3Br",
+            "Compound cannot be converted to string using atoms"
+        );
     }
 }

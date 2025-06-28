@@ -2,11 +2,11 @@ use std::fmt;
 
 use super::element::Element;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct Atom {
     element: Element,
-    neutrons: u8,
-    electrons: u8, // same as protons
+    pub neutrons: u8,
+    pub electrons: u8, // same as protons
 }
 
 #[allow(dead_code)]
@@ -41,6 +41,12 @@ impl Atom {
 impl fmt::Display for Atom {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.element.as_str())
+    }
+}
+
+impl PartialEq for Atom {
+    fn eq(&self, other: &Self) -> bool {
+        self.element == other.element
     }
 }
 

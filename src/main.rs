@@ -11,6 +11,8 @@ fn main() {
         .linear_chain(6)
         .expect("Linear chain didn't work")
         .build();
-    let chain = Chain::from(&cmp);
+    dbg!(&cmp);
+    let chain = Chain::from(&cmp).group().minimize();
+    dbg!(&chain);
     dbg!(chain.to_string());
 }
