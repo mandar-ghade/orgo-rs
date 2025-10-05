@@ -22,9 +22,8 @@ fn run_cmp_builder() -> CompoundBuilderResult<Compound> {
 }
 
 fn main() {
-    let atom = Atom::from_str_unchecked("Al");
-    let cfg = Configuration::from_atom(&atom).build();
-    dbg!(&cfg.to_string());
+    let mut atom = Atom::from_str_unchecked("Al");
+    dbg!(atom.get_config());
     // let cmp = run_cmp_builder().expect("Compound was expected");
     // dbg!(&cmp);
     // dbg!(&cmp.to_string());

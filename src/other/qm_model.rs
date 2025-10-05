@@ -8,7 +8,7 @@ use lazy_static::lazy_static;
 
 use crate::matter::atom::{self, Atom};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Configuration {
     pub vec: Vec<Subshell>,
     pub electrons: u32,
@@ -23,13 +23,6 @@ impl Configuration {
         Self {
             vec: Vec::new(),
             electrons,
-        }
-    }
-
-    pub fn from_atom(atom: &Atom) -> Self {
-        Self {
-            vec: Vec::new(),
-            electrons: atom.electrons as u32,
         }
     }
 

@@ -1,10 +1,13 @@
 use std::fmt;
 
+use crate::other::qm_model::Configuration;
+
 use super::element::Element;
 
 #[derive(Clone, Debug)]
 pub struct Atom {
     element: Element,
+    configuration: Option<Configuration>,
     pub neutrons: u8,
     pub electrons: u8, // same as protons
 }
@@ -15,10 +18,20 @@ impl Atom {
         self.element.number
     }
 
+    pub fn get_config(&mut self) -> String {
+        if self.configuration.is_none() {
+            let cfg =
+                Configuration::from_electrons(self.electrons as u32).build();
+            self.configuration = Some(cfg)
+        }
+        self.configuration.as_ref().unwrap().to_string()
+    }
+
     pub fn new(element_num: u8) -> Option<Self> {
         let element = Element::new(element_num)?;
         Some(Atom {
             electrons: element.number,
+            configuration: None,
             element,
             neutrons: 0,
         })
@@ -28,6 +41,7 @@ impl Atom {
         let element = Element::new_unchecked(element_num);
         Atom {
             electrons: element.number,
+            configuration: None,
             element,
             neutrons: 0,
         }
@@ -37,6 +51,7 @@ impl Atom {
         let element = Element::from_str(input_str)?;
         Some(Atom {
             electrons: element.number,
+            configuration: None,
             element,
             neutrons: 0,
         })
@@ -46,6 +61,7 @@ impl Atom {
         let element = Element::from_str(input_str).expect("Expected atom");
         Atom {
             electrons: element.number,
+            configuration: None,
             element,
             neutrons: 0,
         }
