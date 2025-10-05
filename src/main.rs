@@ -3,8 +3,7 @@ use crate::{
         atom::Atom,
         compound::{
             builder::{CompoundBuilder, CompoundBuilderResult},
-            deserializer::Chain,
-            Compound, CompoundResult,
+            Compound,
         },
     },
     other::qm_model::Configuration,
@@ -23,9 +22,8 @@ fn run_cmp_builder() -> CompoundBuilderResult<Compound> {
 }
 
 fn main() {
-    let atom = Atom::from_str_unchecked("Cr");
+    let atom = Atom::from_str_unchecked("Al");
     let cfg = Configuration::from_atom(&atom).build();
-    dbg!(&cfg);
     dbg!(&cfg.to_string());
     // let cmp = run_cmp_builder().expect("Compound was expected");
     // dbg!(&cmp);

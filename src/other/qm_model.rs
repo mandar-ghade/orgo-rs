@@ -33,20 +33,6 @@ impl Configuration {
         }
     }
 
-    /// Exceptions to the Aufbau Principle (handled!):
-    ///
-    /// Cr(24): d orbital 3d4 -> 5
-    /// Cu(29): d orbital 3d4 -> 5
-    /// Nb(41): d orbital 4d3 -> 4
-    /// Mo(42): d orbital 4d4 -> 5
-    /// Ru(44): d orbital 4d6 -> 7
-    /// Rh(45): d orbital 4d7 -> 8
-    /// Pd(46): d orbital 4d8 -> 10 ( - 2 5s)
-    /// Ag(47): d orbital 4d9 -> 10
-    ///
-    /// Pt(78): d orbital 5d8 -> 9
-    /// Au(79): d orbital 5d9 -> 10 ( - 1 6s)
-
     /// Gets subshell
     /// O(n) subshell search, where n is number of subshells
     fn get_subshell(
@@ -103,16 +89,9 @@ impl Configuration {
                 vec.push(front);
                 break;
             }
-            ///
-            /// 1s2
-            /// 2s2 2p6
-            /// 3s2 3p6 3d10
-            /// 4s2 4p6 4d10 4f14
-            ///
             let l = front.l;
             let mut new_n = front.n;
             let last = front.get_next();
-            dbg!(&front);
             vec.push(front);
             if l != 0 {
                 for new_l in (0..l).rev() {
@@ -121,8 +100,8 @@ impl Configuration {
                     }
                     new_n += 1;
                     let mut subshell =
-                        dbg!(Subshell::generate_subshell(new_n, new_l)
-                            .expect("Subshell expected."));
+                        Subshell::generate_subshell(new_n, new_l)
+                            .expect("Subshell expected.");
                     subshell.fill_by(amount_left);
                     amount_left -= subshell.current;
                     vec.push(subshell);
@@ -130,7 +109,6 @@ impl Configuration {
             }
             if amount_left != 0 {
                 queue.push_back(last.expect("Adjacent subshell expected"));
-                dbg!(&queue);
             }
         }
         self.vec = vec;
@@ -224,11 +202,6 @@ impl Subshell {
         } else {
             self.current -= amount;
         }
-    }
-
-    pub fn transfer(&mut self, amount: u32, other: &mut Self) {
-        self.remove_by(amount);
-        other.fill_by(amount);
     }
 }
 
