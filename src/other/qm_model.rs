@@ -6,6 +6,8 @@ use std::{
 use itertools::Itertools;
 use lazy_static::lazy_static;
 
+use crate::matter::atom::{self, Atom};
+
 #[derive(Debug)]
 pub struct Configuration {
     pub vec: Vec<Subshell>,
@@ -13,22 +15,6 @@ pub struct Configuration {
 }
 
 /// TODO: Work on exceptions
-/// Exceptions:
-///
-/// Cr(24): d orbital 3d4 -> 5
-/// Cu(29): d orbital 3d4 -> 5
-///
-/// Nb(41): d orbital 4d3 -> 4
-/// Mo(42): d orbital 4d4 -> 5
-/// Ru(44): d orbital 4d6 -> 7
-/// Rh(45): d orbital 4d7 -> 8
-/// Pd(46): d orbital 4d8 -> 10 ( - 2 3s)
-/// Ag(47): d orbital 4d9 -> 10
-///
-/// Pt(78): d orbital 5d8 -> 9
-/// Au(79): d orbital 5d9 -> 10 ( - 1 4s)
-///
-/// U(92): d orbital 5d9 -> 10 ( - 1 4s)
 
 impl Configuration {
     /// Assuming neutral, unionized
@@ -40,7 +26,69 @@ impl Configuration {
         }
     }
 
-    pub fn build(&mut self) {
+    pub fn from_atom(atom: &Atom) -> Self {
+        Self {
+            vec: Vec::new(),
+            electrons: atom.electrons as u32,
+        }
+    }
+
+    /// Exceptions to the Aufbau Principle (handled!):
+    ///
+    /// Cr(24): d orbital 3d4 -> 5
+    /// Cu(29): d orbital 3d4 -> 5
+    /// Nb(41): d orbital 4d3 -> 4
+    /// Mo(42): d orbital 4d4 -> 5
+    /// Ru(44): d orbital 4d6 -> 7
+    /// Rh(45): d orbital 4d7 -> 8
+    /// Pd(46): d orbital 4d8 -> 10 ( - 2 5s)
+    /// Ag(47): d orbital 4d9 -> 10
+    ///
+    /// Pt(78): d orbital 5d8 -> 9
+    /// Au(79): d orbital 5d9 -> 10 ( - 1 6s)
+
+    /// Gets subshell
+    /// O(n) subshell search, where n is number of subshells
+    fn get_subshell(
+        &mut self,
+        n: u32,
+        orbital: Orbital,
+    ) -> Option<&mut Subshell> {
+        let l = *ORBITAL_TO_ANGULAR.get(&orbital)?;
+        self.vec
+            .iter_mut()
+            .find(|subshell| subshell.n == n && subshell.l == l)
+    }
+
+    fn transfer(
+        &mut self,
+        electrons: u32,
+        lhs: (u32, Orbital),
+        rhs: (u32, Orbital),
+    ) -> Option<()> {
+        // TODO: Delete subshells with 0 electrons
+        let (lhs_n, lhs_o) = lhs;
+        let (rhs_n, rhs_o) = rhs;
+        let four_s = self.get_subshell(lhs_n, lhs_o)?;
+        four_s.remove_by(electrons); // can't use transfer func or the borrow checker will defeat me
+        let three_d = self.get_subshell(rhs_n, rhs_o)?;
+        three_d.fill_by(electrons);
+        None
+    }
+
+    fn handle_exception(&mut self) -> Option<()> {
+        match self.electrons {
+            24 | 29 => self.transfer(1, (4, Orbital::S), (3, Orbital::D)),
+            41 | 42 | 44 | 45 | 47 => {
+                self.transfer(1, (5, Orbital::S), (4, Orbital::D))
+            }
+            46 => self.transfer(2, (5, Orbital::S), (4, Orbital::D)),
+            78 | 79 => self.transfer(1, (6, Orbital::S), (5, Orbital::D)),
+            _ => None,
+        }
+    }
+
+    pub fn build(&mut self) -> Self {
         let mut queue = VecDeque::<Subshell>::new();
         let mut vec = Vec::<Subshell>::new();
         let mut amount_left = self.electrons;
@@ -86,6 +134,11 @@ impl Configuration {
             }
         }
         self.vec = vec;
+        self.handle_exception();
+        Self {
+            vec: self.vec.clone(),
+            electrons: self.electrons,
+        }
     }
 }
 
@@ -100,7 +153,7 @@ impl fmt::Display for Configuration {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Subshell {
     pub n: u32,
     pub l: u32,
@@ -173,9 +226,9 @@ impl Subshell {
         }
     }
 
-    pub fn transfer_electron_to(&mut self, other: &mut Self) {
-        self.remove_by(1);
-        other.fill_by(1);
+    pub fn transfer(&mut self, amount: u32, other: &mut Self) {
+        self.remove_by(amount);
+        other.fill_by(amount);
     }
 }
 
@@ -205,6 +258,12 @@ lazy_static! {
         (1, Orbital::P),
         (2, Orbital::D),
         (3, Orbital::F),
+    ]);
+    pub static ref ORBITAL_TO_ANGULAR: HashMap<Orbital, u32> = HashMap::from([
+        (Orbital::S, 0),
+        (Orbital::P, 1),
+        (Orbital::D, 2),
+        (Orbital::F, 3),
     ]);
     pub static ref ELECTRON_MAXES: HashMap<Orbital, u32> = HashMap::from([
         (Orbital::S, 2),

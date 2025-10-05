@@ -1,8 +1,11 @@
 use crate::{
-    matter::compound::{
-        builder::{CompoundBuilder, CompoundBuilderResult},
-        deserializer::Chain,
-        Compound, CompoundResult,
+    matter::{
+        atom::Atom,
+        compound::{
+            builder::{CompoundBuilder, CompoundBuilderResult},
+            deserializer::Chain,
+            Compound, CompoundResult,
+        },
     },
     other::qm_model::Configuration,
 };
@@ -20,10 +23,10 @@ fn run_cmp_builder() -> CompoundBuilderResult<Compound> {
 }
 
 fn main() {
-    let mut cfg = Configuration::from_electrons(109);
-    cfg.build();
+    let atom = Atom::from_str_unchecked("Cr");
+    let cfg = Configuration::from_atom(&atom).build();
     dbg!(&cfg);
-    dbg!(cfg.to_string());
+    dbg!(&cfg.to_string());
     // let cmp = run_cmp_builder().expect("Compound was expected");
     // dbg!(&cmp);
     // dbg!(&cmp.to_string());

@@ -1,4 +1,4 @@
-use crate::constants::ELEMENTS_VEC;
+use crate::constants::{ELEMENTS, ELEMENTS_VEC};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Element {
@@ -12,6 +12,20 @@ impl Element {
             Some(Element { number })
         } else {
             None
+        }
+    }
+
+    pub fn from_str(input_str: &str) -> Option<Self> {
+        if !ELEMENTS.contains(input_str) {
+            None
+        } else {
+            ELEMENTS_VEC.iter().enumerate().find_map(|(i, e_str)| {
+                if *e_str == input_str {
+                    Some(Element::new((i as u8) + 1))
+                } else {
+                    None
+                }
+            })?
         }
     }
 

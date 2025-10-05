@@ -33,6 +33,24 @@ impl Atom {
         }
     }
 
+    pub fn from_str(input_str: &str) -> Option<Self> {
+        let element = Element::from_str(input_str)?;
+        Some(Atom {
+            electrons: element.number,
+            element,
+            neutrons: 0,
+        })
+    }
+
+    pub fn from_str_unchecked(input_str: &str) -> Self {
+        let element = Element::from_str(input_str).expect("Expected atom");
+        Atom {
+            electrons: element.number,
+            element,
+            neutrons: 0,
+        }
+    }
+
     pub fn isotope(&self, neutrons: u8) -> Self {
         let mut iso = self.clone();
         iso.neutrons = neutrons;
