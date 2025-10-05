@@ -1,4 +1,7 @@
-use std::collections::{BTreeSet, HashMap};
+use std::{
+    collections::{BTreeSet, HashMap},
+    error::Error,
+};
 
 use crate::matter::{
     atom::Atom,
@@ -26,7 +29,10 @@ pub type CompoundBuilderResult<T> = Result<T, CompoundBuilderError>;
 
 #[derive(thiserror::Error, strum_macros::Display, Clone, Debug)]
 pub enum CompoundBuilderError {
-    SideChainError(String),
+    SideChainError(String), // less generalized
+    OctetError(String),
+    NoSuchBackboneError(String),
+    NoRemoteAtomsError(String),
 }
 
 impl CompoundBuilder {
@@ -56,7 +62,7 @@ impl CompoundBuilder {
     }
 
     #[allow(dead_code)]
-    fn get_atom_unsafe(&self, idx: usize) -> &Atom {
+    fn atom_at(&self, idx: usize) -> &Atom {
         if let Some(atom) = self.atoms.get(idx) {
             atom
         } else {
@@ -117,7 +123,9 @@ impl CompoundBuilder {
             let base_loc = *locations.get(i).expect("Backbone loc not found.");
             let remote_atoms = self.get_remote_side_chains(i)?;
             if remote_atoms.len() > 4 {
-                todo!("Expanded octet prohibited (for now)");
+                return Err(CompoundBuilderError::OctetError(
+                    "Expanded octet prohibited (for now)".into(),
+                ));
             }
             let choices = Vec::from([(-1, 0), (1, 0), (0, 1), (0, -1)]);
             // LEFT, RIGHT, UP, DOWN
@@ -142,7 +150,7 @@ impl CompoundBuilder {
                     locations.len() == idx,
                     "Location vector length - remote atom's index mismatch",
                 );
-                locations.push(side_chain_loc.clone());
+                locations.push(side_chain_loc); // clones
                 locations_to_idx.insert(side_chain_loc, idx);
             }
         }
@@ -187,6 +195,52 @@ impl CompoundBuilder {
             self.backbone.clone(),
             self.side_chains.clone(),
         )
+    }
+
+    /// Adds a bromine to a certain atom in a Compound.
+    ///
+    /// # Arguments
+    ///
+    /// `atom_num` - Labeled atom number in the compound
+    ///
+    /// # Returns
+    ///
+    /// A Compound resulting from bromination.
+    pub fn brominate(
+        &mut self,
+        atom_num: usize,
+    ) -> CompoundBuilderResult<&mut Self> {
+        let i = atom_num - 1;
+        if atom_num > self.backbone.len() {
+            return Err(CompoundBuilderError::NoSuchBackboneError(format!(
+                "Cannot brominate non-existant backbone atom with atom num: {}",
+                atom_num
+            )));
+        } else if !self.has_side_chain(i) {
+            return Err(CompoundBuilderError::NoRemoteAtomsError(
+                "No remote atoms exist to brominate".into(),
+            ));
+        }
+        let hydrogen_i: usize = self
+            .get_remote_side_chains(i)?
+            .iter()
+            .find_map(|(atom_i, atom)| {
+                if atom.get_element_num() == 1 {
+                    Some(*atom_i)
+                } else {
+                    None
+                }
+            }).ok_or(CompoundBuilderError::NoRemoteAtomsError(
+                format!("No free hydrogen remaining in the remote side chain for backbone atom number {}", atom_num)
+            ))?;
+        let matched_hydrogen = self
+            .atoms
+            .get_mut(hydrogen_i)
+            .ok_or(CompoundBuilderError::NoRemoteAtomsError(
+                format!("Hydrogen missing error: Hydrogen atom could not be found while brominating atom at atom num {}", atom_num)
+            ))?;
+        *matched_hydrogen = Atom::bromine();
+        Ok(self)
     }
 
     pub fn linear_chain(

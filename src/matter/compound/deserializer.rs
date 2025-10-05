@@ -16,6 +16,45 @@ impl<T> Chain<T>
 where
     T: Display + Clone + PartialEq,
 {
+    pub fn new() -> Self {
+        Chain::Vec(Vec::new(), 1)
+    }
+
+    pub fn push_multiple(self, other: T, count: usize) -> Self {
+        let mut chain = self.push(other.clone());
+        for _ in 1..count {
+            chain = chain.push(other.clone());
+        }
+        chain.group().minimize()
+    }
+
+    pub fn extend_multiple(self, other: Self, count: usize) -> Self {
+        let mut chain = self.extend(other.clone());
+        for _ in 1..count {
+            chain = chain.extend(other.clone());
+        }
+        chain.group().minimize()
+    }
+
+    pub fn extend(self, other: Self) -> Self {
+        let other = other.group().minimize();
+        match self {
+            Self::Vec(v, c) => {
+                let mut new_vec = v;
+                new_vec.push(other);
+                Self::Vec(new_vec, c).group().minimize()
+            }
+            Self::KV(_, _) => {
+                // Grouping & Minimization handled
+                Self::Vec(Vec::from([self, other]), 1).group().minimize()
+            }
+        }
+    }
+
+    pub fn push(self, other: T) -> Self {
+        self.extend(Self::KV(other, 1))
+    }
+
     /// Reverses order of chain
     fn reverse(&mut self) {
         match self {
@@ -387,5 +426,22 @@ mod tests {
             "CH3Br",
             "Compound cannot be converted to string using atoms"
         );
+    }
+
+    #[test]
+    fn test_new_push_funcs_with_atoms() {
+        let hydrogen = Atom::hydrogen();
+        let carbon = Atom::carbon();
+        let methyl = Chain::<Atom>::new()
+            .push(carbon.clone())
+            .push_multiple(hydrogen.clone(), 3);
+        let methylene =
+            Chain::<Atom>::new().push(carbon).push_multiple(hydrogen, 2);
+        let chain = methyl.clone().extend_multiple(methylene, 5).extend(methyl);
+        assert_eq!(
+            chain.to_string(),
+            "CH3(CH2)5CH3",
+            "Atom appending doesn't work for Chains"
+        )
     }
 }

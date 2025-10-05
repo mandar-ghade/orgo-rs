@@ -11,6 +11,10 @@ pub struct Atom {
 
 #[allow(dead_code)]
 impl Atom {
+    pub fn get_element_num(&self) -> u8 {
+        self.element.number
+    }
+
     pub fn new(element_num: u8) -> Option<Self> {
         let element = Element::new(element_num)?;
         Some(Atom {
@@ -29,12 +33,38 @@ impl Atom {
         }
     }
 
-    pub fn hydrogen() -> Self {
-        Atom::new_unchecked(1)
+    pub fn isotope(&self, neutrons: u8) -> Self {
+        let mut iso = self.clone();
+        iso.neutrons = neutrons;
+        iso
+    }
+
+    pub fn bromine() -> Self {
+        Atom::new_unchecked(35)
     }
 
     pub fn carbon() -> Self {
         Atom::new_unchecked(6)
+    }
+
+    pub fn chlorine() -> Self {
+        Atom::new_unchecked(17)
+    }
+
+    pub fn hydrogen() -> Self {
+        Atom::new_unchecked(1).isotope(0)
+    }
+
+    pub fn deuterium() -> Self {
+        Atom::new_unchecked(1).isotope(1)
+    }
+
+    pub fn tritium() -> Self {
+        Atom::new_unchecked(1).isotope(2)
+    }
+
+    pub fn nitrogen() -> Self {
+        Atom::new_unchecked(7)
     }
 }
 
